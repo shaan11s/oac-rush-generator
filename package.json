@@ -1,0 +1,14 @@
+{
+  "name": "oac-rush-generator",
+  "version": "1.0.0",
+  "description": "OAC Rush email HTML generator for AT&T PAC",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "xlsx": "^0.18.5"
+  }
+}
