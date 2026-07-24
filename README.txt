@@ -1,7 +1,7 @@
 # OAC Rush HTML Generator
 AT&T Performing Arts Center — Internal Tool
 
-Paste Hector's OAC Rush email (or upload an Excel/CSV sheet), auto-fetch
+Paste OAC Rush email (or upload an Excel/CSV sheet), auto-fetch
 show images from each event page — including 3rd-party ticketing sites —
 and generate copy-ready HTML blocks for ActiveCampaign.
 
