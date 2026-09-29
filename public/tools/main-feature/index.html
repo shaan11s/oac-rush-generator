@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Main Feature — AT&T PAC</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c60223;
+    --red-dark: #a0011c;
+    --gray-50: #f8f8f8;
+    --gray-100: #f0f0f0;
+    --gray-200: #e0e0e0;
+    --gray-400: #aaaaaa;
+    --gray-600: #666666;
+    --gray-800: #222222;
+    --green: #1a7a3c;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', 'Courier New', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: var(--font);
+    background: #f4f3f0;
+    color: var(--gray-800);
+    min-height: 100vh;
+    padding: 0 0 24px; /* matches the output card's bottom gap so it never slides under the header */
+  }
+
+  header {
+    background: #1a1a1a;
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--red);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-logo svg { width: 22px; height: 22px; }
+  .header-title { color: #fff; font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { color: #888; font-size: 13px; margin-top: 1px; }
+  .header-home {
+    margin-left: auto;
+    color: #bbb; font-size: 13px; font-weight: 500;
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #444; border-radius: var(--radius);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .header-home:hover { color: #fff; border-color: var(--red); }
+
+  /* Steps 1 + 2 stacked on the left; generated HTML on the right, pinned
+     below the sticky header so it stays in view while the left side scrolls. */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px 24px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .left-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .output-card {
+    position: sticky;
+    top: 104px;
+    height: calc(100vh - 128px);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+  }
+  .output-card .card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .output-card .tab-panel.active { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #html-output { flex: 1; min-height: 0; resize: none; }
+  #preview-wrap { flex: 1; min-height: 0; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    .output-card { position: static; height: auto; min-height: 0; }
+    #html-output { height: 340px; flex: none; resize: vertical; }
+    #preview-wrap { height: 70vh; flex: none; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 14px 20px; }
+  }
+
+  .card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+  .step-badge {
+    width: 22px; height: 22px;
+    background: var(--red); color: #fff;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-body { padding: 16px 18px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    line-height: 1.55;
+    resize: vertical;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  textarea:focus, input[type="text"]:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(198,2,35,0.1);
+    background: #fff;
+  }
+  textarea.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  label.field-label {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px; font-weight: 600; font-family: var(--font);
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-secondary { background: var(--gray-100); color: var(--gray-800); border: 1px solid var(--gray-200); }
+  .btn-secondary:hover { background: var(--gray-200); }
+  .btn-ghost { background: transparent; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); color: var(--gray-800); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status { font-size: 13px; color: var(--gray-600); margin-top: 8px; min-height: 20px; }
+  .status.error { color: var(--red); }
+  .status.success { color: var(--green); }
+  .section-hint { font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+
+  /* ── Show cards ── */
+  #shows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+  }
+  .show-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .show-card { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .show-card-head {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .show-num {
+    background: var(--red); color: #fff;
+    border-radius: 10px;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+  }
+  .show-card-head .show-name { color: #ccc; font-size: 12px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head-btn {
+    background: none; border: none; color: #888; cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 5px; border-radius: 3px;
+  }
+  .head-btn:hover:not(:disabled) { color: #fff; background: #333; }
+  .head-btn:disabled { opacity: 0.3; cursor: default; }
+  .show-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--gray-50);
+  }
+  .show-fields .field-full { grid-column: 1 / -1; }
+  .show-fields textarea { min-height: 96px; }
+  @media (max-width: 560px) { .show-fields { grid-template-columns: 1fr; } }
+
+  .img-row { display: flex; gap: 6px; align-items: center; }
+  .img-row input { flex: 1; }
+  .img-thumb {
+    width: 64px; height: 36px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-200);
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gray-400); font-size: 13px;
+  }
+
+  /* ── Output ── */
+  #html-output {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    background: #f6f6fa;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    width: 100%;
+    outline: none;
+    color: #334;
+  }
+  /* The preview renders the blocks at their real 675px email width inside
+     a scaled-down frame, so they fit the panel without reflowing. */
+  #preview-wrap {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    background: #fff;
+  }
+  #preview-frame {
+    position: absolute; top: 0; left: 0;
+    border: none;
+    background: #fff;
+    transform-origin: top left;
+  }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 12px; align-items: flex-end; }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    color: var(--gray-600); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .tab.active { color: var(--red); border-bottom-color: var(--red); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="10" rx="1"/><path d="M6 17h12M8 20h8"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">Main Feature</div>
+    <div class="header-sub">AT&amp;T Performing Arts Center — Internal Tool</div>
+  </div>
+  <a class="header-home" href="../../index.html">&larr; All tools</a>
+</header>
+
+<main>
+
+  <div class="left-col">
+  <!-- Step 1 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <h2>Add the Show</h2>
+    </div>
+    <div class="card-body">
+      <label class="field-label" for="links-input">Event link</label>
+      <input type="text" id="links-input" placeholder="https://attpac.org/event/the-whos-tommy" onkeydown="if (event.key === 'Enter') loadLinks()">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="load-btn" onclick="loadLinks()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          Load Show
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="startBlank()">Fill in manually</button>
+      </div>
+      <p class="section-hint">The image, dates, venue and a starting blurb come from the event page. Loading another link replaces the current show.</p>
+      <p class="status" id="load-status"></p>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <h2>Review &amp; Edit</h2>
+      <button class="btn btn-ghost btn-sm" id="clear-btn" style="margin-left:auto; display:none;" onclick="clearShow()">Clear</button>
+    </div>
+    <div class="card-body">
+      <div id="shows-container">
+        <div class="empty-state">The loaded show will appear here.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <!-- Step 3 -->
+  <div class="card output-card">
+    <div class="card-header">
+      <div class="step-badge">3</div>
+      <h2>Generated HTML</h2>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="copyHTML()" id="copy-btn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy HTML
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHTML()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .html
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('code', this)">HTML Code</div>
+        <div class="tab" onclick="switchTab('preview', this)">Preview</div>
+      </div>
+      <div id="tab-code" class="tab-panel active">
+        <textarea id="html-output" class="mono" readonly placeholder="HTML will appear here after loading a show..."></textarea>
+        <p class="section-hint" id="output-hint"></p>
+      </div>
+      <div id="tab-preview" class="tab-panel">
+        <div id="preview-wrap"><iframe id="preview-frame" title="Email preview"></iframe></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// Image fetching needs the tool's own Node server (npm start, port 3000). If
+// the page was opened some other way — VS Code Live Server, or the file
+// directly — send those requests to port 3000 instead of the current origin.
+const API_BASE = location.protocol.startsWith('http') && location.port === '3000' ? '' : 'http://localhost:3000';
+
+const DEFAULT_CTA = 'Buy Tickets';
+
+let show = null; // this tool builds exactly one feature
+
+function setStatus(msg, type) {
+  const el = document.getElementById('load-status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function newShow(fields) {
+  return {
+    title: '', headline: '', dates: '', venue: '', blurb: '',
+    cta: DEFAULT_CTA, url: '', noteBold: '', noteRest: '',
+    rawImgUrl: '', imgUrl: '', imgAlt: '',
+    ...fields,
+  };
+}
+
+// ── Loading the link ─────────────────────────────────────────────────────────
+
+async function loadLinks() {
+  const input = document.getElementById('links-input');
+  const url = input.value.trim();
+  if (!/^https?:\/\//i.test(url)) { setStatus('Paste an https:// event link.', 'error'); return; }
+
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+  setStatus('Loading…');
+  try {
+    const res = await fetch(API_BASE + '/api/event-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not read that page.');
+    show = newShow({
+      url,
+      title: data.title,
+      headline: data.title,          // the example uses a tagline — type over this
+      dates: dateOnly(data.dates),   // keeps the year ("Jun 3 - 5, 2027"), drops any time
+      venue: data.venue,
+      blurb: data.description || '', // usually longer than the email needs — trim it
+      rawImgUrl: data.imageUrl || '',
+      imgUrl: data.imageUrl ? buildImageUrl(data.imageUrl) : '',
+      imgAlt: data.title,
+    });
+    input.value = '';
+    renderShow();
+    generateHTML();
+    setStatus('✓ Loaded. Replace the headline with a tagline and trim the blurb if needed.', 'success');
+  } catch (e) {
+    setStatus(e instanceof TypeError ? 'Could not reach the tool server — make sure it is running (npm start).' : e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+// Some pages put a time in the date line ("October 11, 2026 - 2pm Matinee
+// Performance"). Keep only the date: drop whatever follows the year unless
+// it's the end of a date range ("Dec 27, 2026 - Jan 3, 2027"), and drop a
+// trailing time when there's no year ("Oct 7 at 7:30 pm").
+const MONTH_START = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+function dateOnly(dates) {
+  dates = (dates || '').trim();
+  const m = dates.match(/^(.*\b(?:19|20)\d{2})\s*[-–—,]?\s*(.+)$/);
+  if (m && !MONTH_START.test(m[2]) && !/\b(19|20)\d{2}\b/.test(m[2])) return m[1];
+  return dates.replace(/,?\s*(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)(?=\W|$).*$/i, '').trim();
+}
+
+// Crops the photo to 16:9 (the shape of the example's feature image) at 2×
+// the 675px display width so it stays sharp. attpac.org photos are cropped by
+// imgix directly; anything else goes through the wsrv.nl image proxy.
+function buildImageUrl(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    const u = new URL(rawUrl);
+    if (u.hostname.includes('imgix.net')) {
+      u.search = '';
+      u.searchParams.set('fit', 'crop');
+      u.searchParams.set('crop', 'faces,entropy,center');
+      u.searchParams.set('w', '1350');
+      u.searchParams.set('h', '759');
+      u.searchParams.set('q', '75');
+      u.searchParams.set('fm', 'jpg');
+      return u.toString();
+    }
+  } catch (e) { return rawUrl; }
+  const params = new URLSearchParams({ url: rawUrl.replace(/^https?:\/\//, ''), w: '1350', h: '759', fit: 'cover', a: 'attention', output: 'jpg', q: '75' });
+  return `https://wsrv.nl/?${params}`;
+}
+
+function startBlank() {
+  show = newShow({});
+  renderShow();
+  generateHTML();
+  setStatus('');
+}
+
+function clearShow() {
+  show = null;
+  renderShow();
+  generateHTML();
+  setStatus('');
+}
+
+// ── Show card ────────────────────────────────────────────────────────────────
+
+function renderShow() {
+  const container = document.getElementById('shows-container');
+  document.getElementById('clear-btn').style.display = show ? '' : 'none';
+  if (!show) {
+    container.innerHTML = '<div class="empty-state">The loaded show will appear here.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  container.appendChild(makeShowCard());
+}
+
+function field(key, label, opts = {}) {
+  const input = opts.textarea
+    ? `<textarea rows="5" placeholder="${escAttr(opts.placeholder || '')}" oninput="updateShow('${key}', this.value)">${escHtml(show[key])}</textarea>`
+    : `<input type="text" value="${escAttr(show[key])}" placeholder="${escAttr(opts.placeholder || '')}" oninput="updateShow('${key}', this.value)">`;
+  return `<div class="${opts.full ? 'field-full' : ''}">
+        <label class="field-label">${label}</label>
+        ${input}
+      </div>`;
+}
+
+function makeShowCard() {
+  const card = document.createElement('div');
+  card.className = 'show-card';
+  card.innerHTML = `
+    <div class="show-card-head">
+      <span class="show-num">Feature</span>
+      <span class="show-name">${escHtml(show.title || 'Untitled')}</span>
+    </div>
+    <div class="show-fields">
+      <div class="field-full">
+        <label class="field-label">Image URL</label>
+        <div class="img-row">
+          <img class="img-thumb" id="img-thumb" alt="" ${show.imgUrl ? `src="${escAttr(show.imgUrl)}"` : ''}>
+          <input type="text" value="${escAttr(show.rawImgUrl)}" placeholder="Filled from the event page, or paste an image URL" oninput="updateImage(this.value)">
+        </div>
+      </div>
+      ${field('headline', 'Headline (28px bold)', { full: true, placeholder: 'e.g. The Rock Opera That Changed Everything!' })}
+      ${field('dates', 'Dates')}
+      ${field('venue', 'Venue')}
+      ${field('blurb', 'Blurb — put *asterisks* around words for italics', { full: true, textarea: true })}
+      ${field('cta', 'Button Text')}
+      ${field('imgAlt', 'Image Alt Text')}
+      ${field('url', 'Link URL (image + button)', { full: true })}
+      ${field('noteBold', 'Note Below Button — Bold Part', { full: true, placeholder: 'Optional, e.g. Center Circle Members … can purchase tickets TODAY!' })}
+      ${field('noteRest', 'Note Below Button — Regular Part', { full: true, placeholder: 'Optional, e.g. Click above or call Donor Services at …' })}
+    </div>`;
+  return card;
+}
+
+function updateShow(key, value) {
+  if (!show) return;
+  show[key] = value;
+  generateHTML();
+}
+
+function updateImage(raw) {
+  if (!show) return;
+  show.rawImgUrl = raw.trim();
+  show.imgUrl = buildImageUrl(show.rawImgUrl);
+  const thumb = document.getElementById('img-thumb');
+  if (show.imgUrl) thumb.src = show.imgUrl; else thumb.removeAttribute('src');
+  generateHTML();
+}
+
+// ── HTML generation ──────────────────────────────────────────────────────────
+// Copies the main feature from the example email ("1 main dedicated"): a
+// full-width 675px image, a 28px bold centred headline, an 18px extra-bold
+// "Dates | Venue" line with a red bar, an 18px justified blurb, a 30px
+// spacer, a centred red button, then an optional 18px justified note (bold
+// lead-in + regular text). Empty text rows are left out.
+
+const BASE_ID = 950000;
+const TABLE_STYLE = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: collapse; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
+const TABLE_STYLE_INITIAL = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: initial !important; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
+
+// Outlook draws the button from the VML shape, which needs a fixed width.
+// Fitted to the examples: 117px for "Buy Tickets", 274px for "Login to
+// Access Your Presale Tickets".
+function buttonWidth(text) {
+  return Math.max(117, Math.round(117 + (text.length - 11) * 6.28));
+}
+
+function imageRow(id) {
+  return `<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr id="layout-row${id}" class="layout layout-row widget _widget_picture " align="left" style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="image-td" align="left" valign="top" width="675" style="mso-line-height-rule: exactly;"><a href="${escAttr(show.url || '#')}" style="margin: 0; outline: none; padding: 0; color: #c60223; display: block; min-width: 100%;"><img src="${escAttr(show.imgUrl || 'INSERT_IMAGE_URL_HERE')}" alt="${escAttr(show.imgAlt || show.title)}" width="675" style="border: none; display: block; outline: none; width: 675px; opacity: 1; max-width: 100%;"></a></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+// The headline, date/venue and blurb rows share one wrapper; only the inner
+// <div> differs.
+function textRow(id, inner) {
+  return `<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id}" valign="top" style="mso-line-height-rule: exactly; padding: 0px 10px 0px 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id}" class="layout layout-row widget _widget_text style${id}" style="mso-line-height-rule: exactly; margin: 0; padding: 0;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; padding: 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td id="text_div${id + 5}" class="td_text td_block" valign="top" align="left" width="635" style="line-height: 140%; mso-line-height-rule: exactly; margin: 0; outline: none; padding: 0; color: inherit; font-size: 12px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; font-family: arial;">
+${inner}<!--[if (gte mso 12)&(lte mso 15) ]>
+<style data-ac-keep="true" data-ac-inline="false"> #text_div${id + 5}, #text_div${id + 5} div { line-height: 140% !important; };
+</style>
+<![endif]--></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function headlineInner() {
+  return `<div class="" style="line-height: 140%; margin: 0; outline: none; padding: 0; color: inherit; font-size: 28px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; mso-line-height-rule: exactly;" data-line-height="1.4">
+<div class="" style="margin: 0; outline: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit; text-align: center;">
+<span style="color: #000000; font-size: 28px; font-weight: bold; line-height: inherit; text-decoration: inherit; font-family: arial; font-style: normal;" class="">${escHtml(show.headline)}</span>
+<br class="">
+</div>
+</div>`;
+}
+
+function whenWhereInner() {
+  const bar = ' <span style="color: #c60223; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit;" class="">|</span> ';
+  const text = [show.dates, show.venue].filter(Boolean).map(escHtml).join(bar);
+  return `<div style="line-height: 140%; margin: 0; outline: none; padding: 0; color: inherit; font-size: 18px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; mso-line-height-rule: exactly;" data-line-height="1.4">
+<div style="margin: 0; outline: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit; text-align: center;">
+<span style="color: inherit; font-size: inherit; font-weight: 800; line-height: inherit; text-decoration: inherit; font-family: arial; font-style: normal;">${text}</span>
+<br style="color: #000000;">
+</div>
+</div>`;
+}
+
+// *Words in asterisks* become italics, the way the example sets show titles
+// (<em>TOMMY</em>).
+function formatBlurb(text) {
+  return escHtml(text)
+    .replace(/\*([^*\n]+)\*/g, '<em style="margin: 0; outline: none; padding: 0;">$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+function blurbInner() {
+  return `<div style="line-height: 140%; margin: 0; outline: none; padding: 0; color: inherit; font-size: 18px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; mso-line-height-rule: exactly;" data-line-height="1.4">
+<div style="margin: 0; outline: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit; text-align: justify;">
+<span style="color: inherit; font-size: inherit; font-weight: 400; line-height: inherit; text-decoration: inherit; font-family: arial; font-style: normal;" class="">${formatBlurb(show.blurb)}</span>
+<br>
+</div>
+</div>`;
+}
+
+function spacerRow(id, height) {
+  return `<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr id="layout-row${id}" class="layout layout-row widget _widget_spacer " style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td valign="top" height="${height}" style="mso-line-height-rule: exactly;">
+<div class="spacer" style="margin: 0; outline: none; padding: 0; height: ${height}px;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="spacer-body" valign="top" height="${height}" width="675" style="mso-line-height-rule: exactly;">&nbsp;</td>
+</tr>
+</table>
+</div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function buttonRow(id) {
+  const url = escAttr(show.url || '#');
+  const cta = show.cta || DEFAULT_CTA;
+  return `<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id}" valign="top" style="mso-line-height-rule: exactly; padding: 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id}" class="layout layout-row widget _widget_button style${id}" style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; padding: 5px 5px 15px 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="td_button td_block customizable" valign="top" align="left" width="655" style="mso-line-height-rule: exactly;">
+<div class="button-wrapper" style="margin: 0; outline: none; padding: 0; text-align: center;">
+<!--[if mso]> <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${url}" style="v-text-anchor:middle; width:${buttonWidth(cta)}px; height:60px; " arcsize="0%" strokecolor="#c60223" strokeweight="1pt" fillcolor="#c60223" o:button="true" o:allowincell="true" o:allowoverlap="false" > <v:textbox inset="2px,2px,2px,2px"> <center style="color:#ffffff;font-family:Arial; font-size:14px; line-height: 1.1;">${escHtml(cta)}</center> </v:textbox> </v:roundrect>
+<![endif]--> <a href="${url}" style="margin: 0; outline: none; padding: 12px; color: #ffffff; background: #c60223; background-color: #c60223; border: 1px solid #c60223; font-family: Arial; font-size: 14px; display: inline-block; line-height: 1.1; text-align: center; text-decoration: none; mso-hide: all;"> <span style="color:#ffffff;font-family:Arial;font-size:14px;"> ${escHtml(cta)} </span> </a>
+</div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function noteRow(id) {
+  const bold = show.noteBold ? `<span style="color: #000000; font-size: inherit; font-weight: bold; line-height: inherit; text-decoration: inherit; font-family: arial;">${escHtml(show.noteBold)}</span>` : '';
+  const rest = show.noteRest ? `<span style="color: #000000; font-size: inherit; font-weight: 400; line-height: inherit; text-decoration: inherit; font-family: arial;">${bold ? ' ' : ''}${escHtml(show.noteRest)}</span>` : '';
+  return `<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id}" valign="top" style="mso-line-height-rule: exactly; padding: 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id}" class="layout layout-row widget _widget_text style${id}" style="mso-line-height-rule: exactly; margin: 0; padding: 0;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; padding: 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td id="text_div${id + 5}" class="td_text td_block" valign="top" align="left" width="655" style="mso-line-height-rule: exactly; margin: 0; outline: none; padding: 0; color: inherit; font-size: 12px; font-weight: inherit; line-height: 1; text-decoration: inherit; font-family: arial;">
+<div style="margin: 0; outline: none; padding: 0; color: inherit; font-size: 18px; font-weight: inherit; line-height: inherit; text-decoration: inherit;">
+<div style="margin: 0; outline: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit;">
+<div style="margin: 0 0px 0 0px; outline: none; padding: 0; color: #000000; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit; text-align: justify;">
+${bold}${rest}
+</div>
+</div>
+</div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function buildBlocks() {
+  const rows = [imageRow(BASE_ID + 10)];
+  if (show.headline) rows.push(textRow(BASE_ID + 20, headlineInner()));
+  if (show.dates || show.venue) rows.push(textRow(BASE_ID + 30, whenWhereInner()));
+  if (show.blurb) rows.push(textRow(BASE_ID + 40, blurbInner()));
+  rows.push(spacerRow(BASE_ID + 50, 30));
+  rows.push(buttonRow(BASE_ID + 60));
+  if (show.noteBold || show.noteRest) rows.push(noteRow(BASE_ID + 70));
+  return rows.join('\n');
+}
+
+function generateHTML() {
+  const out = document.getElementById('html-output');
+  const hint = document.getElementById('output-hint');
+  if (!show) {
+    out.value = '';
+    hint.textContent = '';
+    refreshPreview();
+    return;
+  }
+  out.value = `<!-- Main feature: ${escComment(show.title || show.headline || 'Untitled')} — paste inside the email's main 675px table, under the header. -->\n` + buildBlocks();
+  hint.textContent = "Paste these rows into the email's main 675px table, under the header." + (show.imgUrl ? '' : ' ⚠ No image yet — search for INSERT_IMAGE_URL_HERE.');
+  refreshPreview();
+}
+
+// Preview renders the blocks in an iframe (wrapped in a bare 675px table) so
+// their styles can't leak into this page.
+const PREVIEW_WIDTH = 700; // a little wider than the 675px email
+const PLACEHOLDER_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="675" height="380"><rect width="675" height="380" fill="#e4e6e7"/><text x="337.5" y="195" font-family="Arial" font-size="13" fill="#8a8f92" text-anchor="middle">No image yet</text></svg>');
+
+function fitPreview() {
+  const wrap = document.getElementById('preview-wrap');
+  const frame = document.getElementById('preview-frame');
+  const scale = Math.min(1, wrap.clientWidth / PREVIEW_WIDTH) || 1;
+  frame.style.width = PREVIEW_WIDTH + 'px';
+  frame.style.height = (wrap.clientHeight / scale) + 'px';
+  frame.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitPreview);
+
+function refreshPreview() {
+  if (!document.getElementById('tab-preview').classList.contains('active')) return;
+  fitPreview();
+  const frame = document.getElementById('preview-frame');
+  if (!show) {
+    frame.srcdoc = '<p style="font-family:sans-serif;color:#aaa;font-size:13px;text-align:center;padding:40px 0;">Load a show to see a preview.</p>';
+    return;
+  }
+  // Preview only: show a grey "No image yet" box instead of a broken image.
+  const blocks = buildBlocks().replaceAll('src="INSERT_IMAGE_URL_HERE"', `src="${PLACEHOLDER_IMG}"`);
+  frame.srcdoc = `<body style="margin:0;font-family:arial;"><table width="675" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;max-width:675px;">${blocks}</table><\/body>`; // "<\/" so Live Server doesn't inject its reload script here
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function switchTab(tab, el) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tab-code, #tab-preview').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  refreshPreview();
+}
+
+function copyHTML() {
+  const ta = document.getElementById('html-output');
+  const text = ta.value;
+  if (!text.trim()) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#1a7a3c'; btn.style.color = '#fff'; btn.style.border = 'none';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }, 2200);
+  }).catch(() => {
+    ta.select(); document.execCommand('copy');
+  });
+}
+
+function downloadHTML() {
+  const content = document.getElementById('html-output').value;
+  if (!content.trim()) { setStatus('Load a show first.', 'error'); return; }
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `main-feature-${new Date().toISOString().slice(0, 10)}.html`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function escHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escAttr(s) { return escHtml(s).replace(/"/g, '&quot;'); }
+function escComment(s) { return (s || '').replace(/--/g, '—'); }
+</script>
+</body>
+</html>

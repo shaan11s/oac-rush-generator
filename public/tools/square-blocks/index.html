@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Square Blocks — AT&T PAC</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c60223;
+    --red-dark: #a0011c;
+    --gray-50: #f8f8f8;
+    --gray-100: #f0f0f0;
+    --gray-200: #e0e0e0;
+    --gray-400: #aaaaaa;
+    --gray-600: #666666;
+    --gray-800: #222222;
+    --green: #1a7a3c;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', 'Courier New', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: var(--font);
+    background: #f4f3f0;
+    color: var(--gray-800);
+    min-height: 100vh;
+    padding: 0 0 24px; /* matches the output card's bottom gap so it never slides under the header */
+  }
+
+  header {
+    background: #1a1a1a;
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--red);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-logo svg { width: 22px; height: 22px; }
+  .header-title { color: #fff; font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { color: #888; font-size: 13px; margin-top: 1px; }
+  .header-home {
+    margin-left: auto;
+    color: #bbb; font-size: 13px; font-weight: 500;
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #444; border-radius: var(--radius);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .header-home:hover { color: #fff; border-color: var(--red); }
+
+  /* Steps 1 + 2 stacked on the left; generated HTML on the right, pinned
+     below the sticky header so it stays in view while the left side scrolls. */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px 24px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .left-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .output-card {
+    position: sticky;
+    top: 104px;
+    height: calc(100vh - 128px);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+  }
+  .output-card .card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .output-card .tab-panel.active { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #html-output { flex: 1; min-height: 0; resize: none; }
+  #preview-wrap { flex: 1; min-height: 0; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    .output-card { position: static; height: auto; min-height: 0; }
+    #html-output { height: 340px; flex: none; resize: vertical; }
+    #preview-wrap { height: 70vh; flex: none; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 14px 20px; }
+  }
+
+  .card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+  .step-badge {
+    width: 22px; height: 22px;
+    background: var(--red); color: #fff;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-body { padding: 16px 18px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    line-height: 1.55;
+    resize: vertical;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  textarea:focus, input[type="text"]:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(198,2,35,0.1);
+    background: #fff;
+  }
+  textarea.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  label.field-label {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px; font-weight: 600; font-family: var(--font);
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-secondary { background: var(--gray-100); color: var(--gray-800); border: 1px solid var(--gray-200); }
+  .btn-secondary:hover { background: var(--gray-200); }
+  .btn-ghost { background: transparent; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); color: var(--gray-800); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status { font-size: 13px; color: var(--gray-600); margin-top: 8px; min-height: 20px; }
+  .status.error { color: var(--red); }
+  .status.success { color: var(--green); }
+  .section-hint { font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+
+  /* ── Show cards ── */
+  #shows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+  }
+  .show-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .show-card { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .show-card-head {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .show-num {
+    background: var(--red); color: #fff;
+    border-radius: 10px;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+  }
+  .show-card-head .show-name { color: #ccc; font-size: 12px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head-btn {
+    background: none; border: none; color: #888; cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 5px; border-radius: 3px;
+  }
+  .head-btn:hover:not(:disabled) { color: #fff; background: #333; }
+  .head-btn:disabled { opacity: 0.3; cursor: default; }
+  .show-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--gray-50);
+  }
+  .show-fields .field-full { grid-column: 1 / -1; }
+  @media (max-width: 560px) { .show-fields { grid-template-columns: 1fr; } }
+
+  .img-row { display: flex; gap: 6px; align-items: center; }
+  .img-row input { flex: 1; }
+  .img-thumb {
+    width: 64px; height: 36px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-200);
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gray-400); font-size: 13px;
+  }
+
+  /* ── Output ── */
+  #html-output {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    background: #f6f6fa;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    width: 100%;
+    outline: none;
+    color: #334;
+  }
+  /* The preview renders the blocks at their real 675px email width inside
+     a scaled-down frame, so they fit the panel without reflowing. */
+  #preview-wrap {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    background: #fff;
+  }
+  #preview-frame {
+    position: absolute; top: 0; left: 0;
+    border: none;
+    background: #fff;
+    transform-origin: top left;
+  }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 12px; align-items: flex-end; }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    color: var(--gray-600); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .tab.active { color: var(--red); border-bottom-color: var(--red); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="6" width="5" height="12" rx="1"/><rect x="9.5" y="6" width="5" height="12" rx="1"/><rect x="16" y="6" width="5" height="12" rx="1"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">Square Blocks</div>
+    <div class="header-sub">AT&amp;T Performing Arts Center — Internal Tool</div>
+  </div>
+  <a class="header-home" href="../../index.html">&larr; All tools</a>
+</header>
+
+<main>
+
+  <div class="left-col">
+  <!-- Step 1 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <h2>Add Shows</h2>
+    </div>
+    <div class="card-body">
+      <label class="field-label" for="links-input">Event links</label>
+      <textarea id="links-input" rows="4" placeholder="Paste one or more attpac.org event links, one per line:
+
+https://attpac.org/event/dallas-theater-center-reykjavik86"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="load-btn" onclick="loadLinks()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          Load Shows
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="addBlankShow()">+ Add show manually</button>
+      </div>
+      <p class="section-hint">Shows are added below in the order you paste them, three per row. Loading more links adds to the list. Images start blank — paste an image link into each show.</p>
+      <p class="status" id="load-status"></p>
+
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <h2>Review Shows</h2>
+      <button class="btn btn-ghost btn-sm" id="clear-btn" style="margin-left:auto; display:none;" onclick="clearShows()">Clear all</button>
+    </div>
+    <div class="card-body">
+      <div id="shows-container">
+        <div class="empty-state">Loaded shows will appear here.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="card output-card">
+    <div class="card-header">
+      <div class="step-badge">3</div>
+      <h2>Generated HTML</h2>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="copyHTML()" id="copy-btn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy HTML
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHTML()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .html
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('code', this)">HTML Code</div>
+        <div class="tab" onclick="switchTab('preview', this)">Preview</div>
+      </div>
+      <div id="tab-code" class="tab-panel active">
+        <textarea id="html-output" class="mono" readonly placeholder="HTML will appear here after loading shows..."></textarea>
+        <p class="section-hint" id="output-hint"></p>
+      </div>
+      <div id="tab-preview" class="tab-panel">
+        <div id="preview-wrap"><iframe id="preview-frame" title="Email preview"></iframe></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// Image fetching needs the tool's own Node server (npm start, port 3000). If
+// the page was opened some other way — VS Code Live Server, or the file
+// directly — send those requests to port 3000 instead of the current origin.
+const API_BASE = location.protocol.startsWith('http') && location.port === '3000' ? '' : 'http://localhost:3000';
+
+const DEFAULT_CTA = 'Buy Tickets';
+
+let shows = [];
+let showCounter = 0;
+
+function setStatus(msg, type) {
+  const el = document.getElementById('load-status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function newShow(fields) {
+  return {
+    id: ++showCounter,
+    url: '', presenter: '', title: '', dates: '', extra: '', venue: '',
+    cta: DEFAULT_CTA, imgUrl: '', imgAlt: '',
+    ...fields,
+  };
+}
+
+// ── Loading links ────────────────────────────────────────────────────────────
+
+async function loadLinks() {
+  const input = document.getElementById('links-input');
+  const urls = input.value.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+  if (!urls.length) { setStatus('Paste at least one https:// event link.', 'error'); return; }
+
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+  setStatus(`Loading ${urls.length} show${urls.length > 1 ? 's' : ''}…`);
+
+  const results = await Promise.all(urls.map(async url => {
+    try {
+      const res = await fetch(API_BASE + '/api/event-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not read that page.');
+      return { url, data };
+    } catch (e) {
+      const msg = e instanceof TypeError ? 'Could not reach the tool server — make sure it is running (npm start).' : e.message;
+      return { url, error: msg };
+    }
+  }));
+
+  const failed = [];
+  results.forEach(({ url, data, error }) => {
+    if (error) { failed.push({ url, error }); return; }
+    shows.push(newShow({
+      url,
+      presenter: data.presenter,
+      title: data.title,
+      ...splitDates(data.dates), // squares keep the year ("Oct 7, 2026")
+      venue: data.venue,
+      imgAlt: data.title,  // image starts blank — pasted in by hand
+    }));
+  });
+
+  btn.disabled = false;
+  renderShows();
+  generateHTML();
+
+  const loaded = results.length - failed.length;
+  if (!failed.length) {
+    setStatus(`✓ Loaded ${loaded} show${loaded > 1 ? 's' : ''}. Check the details below and paste in an image link for each show.`, 'success');
+    input.value = '';
+  } else {
+    // Keep the failed links in the box so they can be fixed and retried.
+    input.value = failed.map(f => f.url).join('\n');
+    setStatus(`${loaded ? `✓ Loaded ${loaded}. ` : ''}${failed.length} link${failed.length > 1 ? 's' : ''} failed (left in the box above): ${failed.map(f => f.error).join(' / ')}`, 'error');
+  }
+}
+
+// Some pages tack a note onto the date: "October 11, 2026 - 2pm Matinee
+// Performance". The example email shows that note on its own line, so move
+// anything after the year into Extra Line — unless it's another date
+// ("Dec 27, 2026 - Jan 3, 2027").
+const MONTH_START = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+function splitDates(dates) {
+  const m = (dates || '').match(/^(.*\b(?:19|20)\d{2})\s*[-–—]\s*(.+)$/);
+  if (!m || MONTH_START.test(m[2]) || /\b(19|20)\d{2}\b/.test(m[2])) return { dates: dates || '' };
+  return { dates: m[1], extra: m[2] };
+}
+
+function addBlankShow() {
+  shows.push(newShow({}));
+  renderShows();
+  generateHTML();
+  const cards = document.querySelectorAll('.show-card');
+  if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearShows() {
+  shows = [];
+  renderShows();
+  generateHTML();
+  setStatus('');
+}
+
+// ── Show cards ───────────────────────────────────────────────────────────────
+
+function renderShows() {
+  const container = document.getElementById('shows-container');
+  document.getElementById('clear-btn').style.display = shows.length ? '' : 'none';
+  if (!shows.length) {
+    container.innerHTML = '<div class="empty-state">Loaded shows will appear here.</div>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'show-list';
+  shows.forEach((show, i) => list.appendChild(makeShowCard(show, i)));
+  container.innerHTML = '';
+  container.appendChild(list);
+}
+
+function field(show, key, label, opts = {}) {
+  return `<div class="${opts.full ? 'field-full' : ''}">
+        <label class="field-label">${label}</label>
+        <input type="text" value="${escAttr(show[key])}" placeholder="${escAttr(opts.placeholder || '')}" oninput="updateShow(${show.id}, '${key}', this.value)">
+      </div>`;
+}
+
+function makeShowCard(show, i) {
+  const card = document.createElement('div');
+  card.className = 'show-card';
+  card.innerHTML = `
+    <div class="show-card-head">
+      <span class="show-num">Show ${i + 1}</span>
+      <span class="show-name" id="show-name-${show.id}">${escHtml(show.title || 'Untitled')}</span>
+      <button class="head-btn" title="Move up" ${i === 0 ? 'disabled' : ''} onclick="moveShow(${show.id}, -1)">&uarr;</button>
+      <button class="head-btn" title="Move down" ${i === shows.length - 1 ? 'disabled' : ''} onclick="moveShow(${show.id}, 1)">&darr;</button>
+      <button class="head-btn" title="Remove" style="font-size:16px;" onclick="removeShow(${show.id})">&times;</button>
+    </div>
+    <div class="show-fields">
+      ${field(show, 'presenter', 'Presenter', { placeholder: 'e.g. Dallas Theater Center Presents' })}
+      ${field(show, 'title', 'Show Title (bold)')}
+      ${field(show, 'dates', 'Dates')}
+      ${field(show, 'extra', 'Extra Line', { placeholder: 'Optional, e.g. 2pm Matinee Performance' })}
+      ${field(show, 'venue', 'Venue')}
+      ${field(show, 'cta', 'Button Text')}
+      ${field(show, 'imgAlt', 'Image Alt Text')}
+      ${field(show, 'url', 'Link URL', { full: true })}
+      <div class="field-full">
+        <label class="field-label">Image URL</label>
+        <div class="img-row">
+          <img class="img-thumb" id="img-thumb-${show.id}" alt="" ${show.imgUrl ? `src="${escAttr(show.imgUrl)}"` : ''}>
+          <input type="text" value="${escAttr(show.imgUrl)}" placeholder="Paste an image URL" oninput="updateImage(${show.id}, this.value)">
+        </div>
+      </div>
+    </div>`;
+  return card;
+}
+
+function updateShow(id, key, value) {
+  const show = shows.find(s => s.id === id);
+  if (!show) return;
+  show[key] = value;
+  if (key === 'title') document.getElementById('show-name-' + id).textContent = value || 'Untitled';
+  generateHTML();
+}
+
+function updateImage(id, raw) {
+  const show = shows.find(s => s.id === id);
+  if (!show) return;
+  show.imgUrl = raw.trim(); // used exactly as pasted
+  const thumb = document.getElementById('img-thumb-' + id);
+  if (show.imgUrl) thumb.src = show.imgUrl; else thumb.removeAttribute('src');
+  generateHTML();
+}
+
+function moveShow(id, dir) {
+  const i = shows.findIndex(s => s.id === id);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= shows.length) return;
+  [shows[i], shows[j]] = [shows[j], shows[i]];
+  renderShows();
+  generateHTML();
+}
+
+function removeShow(id) {
+  shows = shows.filter(s => s.id !== id);
+  renderShows();
+  generateHTML();
+}
+
+// ── HTML generation ──────────────────────────────────────────────────────────
+// Copies the "Upcoming Shows" squares from the example email. Each row is a
+// 225px column plus a 450px column holding two more 225px columns (the way
+// ActiveCampaign nests three columns). A square is a grey (#bfc4c6) image
+// area, a grey 12px text area, then a red button on white. Rows are
+// separated by 10px spacers. A short last row gets empty columns (an empty
+// table, same as the example uses) so the squares keep their size and place.
+
+const PER_ROW = 3;
+const rowId = r => 800000 + (r + 1) * 100;
+
+const TABLE_STYLE = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: collapse; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
+const TABLE_STYLE_INITIAL = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: initial !important; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
+const TW_RESET = '--tw-shadow: 0 0 transparent; --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,0.5); --tw-ring-offset-shadow: 0 0 transparent; --tw-ring-shadow: 0 0 transparent;';
+const SPAN_NORMAL = 'color: #000000; font-size: 12px; font-weight: 400; line-height: inherit; text-decoration: inherit; font-family: arial; font-style: normal;';
+const SPAN_BOLD = `color: #000000; font-size: 12px; font-weight: bold; line-height: inherit; text-decoration: inherit; ${TW_RESET} font-family: arial; font-style: normal;`;
+
+// Outlook draws the button from the VML shape, which needs a fixed width;
+// Fitted to the example emails: 117px for "Buy Tickets", 274px for "Login
+// to Access Your Presale Tickets".
+function buttonWidth(text) {
+  return Math.max(117, Math.round(117 + (text.length - 11) * 6.28));
+}
+
+function textBlock(show) {
+  const lines = [
+    show.presenter && { text: show.presenter, bold: false },
+    show.title && { text: show.title, bold: true },
+    show.dates && { text: show.dates, bold: false },
+    show.extra && { text: show.extra, bold: false },
+    show.venue && { text: show.venue, bold: false },
+  ].filter(Boolean);
+  const spans = lines.map((l, i) =>
+    `<span style="${l.bold ? SPAN_BOLD : SPAN_NORMAL}" class="">${escHtml(l.text)}${i === lines.length - 1 ? '<br>' : ''}</span>`);
+  return spans.join('\n<br style="" class="">') + '\n<br>';
+}
+
+function square(show, id) {
+  const url = escAttr(show.url || '#');
+  const cta = show.cta || DEFAULT_CTA;
+  return `<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="225" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id + 1}" valign="top" style="mso-line-height-rule: exactly; padding: 0 10px 0 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id + 1}" class="layout layout-row widget _widget_picture style${id + 1}" align="center" style="mso-line-height-rule: exactly; background-color: #bfc4c6;">
+<td id="layout-row-padding${id + 1}" valign="top" style="mso-line-height-rule: exactly; background-color: #bfc4c6; padding: 10px 10px 0px 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="image-td" align="center" valign="top" width="185" style="mso-line-height-rule: exactly;"><a href="${url}" style="margin: 0; outline: none; padding: 0; color: #c60223; display: block; min-width: 100%;"><img src="${escAttr(show.imgUrl || 'INSERT_IMAGE_URL_HERE')}" alt="${escAttr(show.imgAlt || show.title)}" width="185" style="border: none; display: block; outline: none; width: 185px; opacity: 1; max-width: 100%;"></a></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id + 2}" valign="top" style="mso-line-height-rule: exactly; padding: 0px 10px 0px 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id + 2}" class="layout layout-row widget _widget_text style${id + 2}" style="mso-line-height-rule: exactly; margin: 0; padding: 0; background-color: #bfc4c6;">
+<td id="layout-row-padding${id + 2}" valign="top" style="mso-line-height-rule: exactly; background-color: #bfc4c6; padding: 10px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td id="text_div${id + 4}" class="td_text td_block" valign="top" align="left" width="185" style="line-height: 140%; mso-line-height-rule: exactly; margin: 0; outline: none; padding: 0; color: inherit; font-size: 12px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; font-family: arial;">
+<div style="line-height: 140%; margin: 0; outline: none; padding: 0; color: inherit; font-size: 12px; font-weight: inherit; line-height: 1.4; text-decoration: inherit; mso-line-height-rule: exactly;" class="" data-line-height="1.4">
+<div style="margin: 0; outline: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; text-decoration: inherit; text-align: left;" class=""></div>${textBlock(show)}
+</div><!--[if (gte mso 12)&(lte mso 15) ]>
+<style data-ac-keep="true" data-ac-inline="false"> #text_div${id + 4}, #text_div${id + 4} div { line-height: 140% !important; };
+</style>
+<![endif]--></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+<tr style="mso-line-height-rule: exactly;">
+<td id="layout-row-margin${id + 3}" valign="top" style="mso-line-height-rule: exactly; padding: 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
+<tr id="layout-row${id + 3}" class="layout layout-row widget _widget_button style${id + 3}" style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id + 3}" valign="top" style="mso-line-height-rule: exactly; padding: 5px 5px 15px 5px;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="td_button td_block customizable" valign="top" align="left" width="205" style="mso-line-height-rule: exactly;">
+<div class="button-wrapper" style="margin: 0; outline: none; padding: 0; text-align: center;">
+<!--[if mso]> <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${url}" style="v-text-anchor:middle; width:${buttonWidth(cta)}px; height:60px; " arcsize="0%" strokecolor="#c60223" strokeweight="1pt" fillcolor="#c60223" o:button="true" o:allowincell="true" o:allowoverlap="false" > <v:textbox inset="2px,2px,2px,2px"> <center style="color:#ffffff;font-family:Arial; font-size:14px; line-height: 1.1;">${escHtml(cta)}</center> </v:textbox> </v:roundrect>
+<![endif]--> <a href="${url}" style="margin: 0; outline: none; padding: 12px; color: #ffffff; background: #c60223; background-color: #c60223; border: 1px solid #c60223; font-family: Arial; font-size: 14px; display: inline-block; line-height: 1.1; text-align: center; text-decoration: none; mso-hide: all;"> <span style="color:#ffffff;font-family:Arial;font-size:14px;"> ${escHtml(cta)} </span> </a>
+</div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+</table>`;
+}
+
+// One 225px column: a square, or an empty table if there's no show for it.
+function column(show, rId, k) {
+  const id = rId + (k + 1) * 10;
+  const inner = show
+    ? square(show, id)
+    : `<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="225" style="${TABLE_STYLE}"></table>`;
+  return `<td id="layout_table_sb${rId}_c${k}" valign="top" width="225" style="mso-line-height-rule: exactly;">
+${inner}</td>`;
+}
+
+function squareRow(rowShows, r) {
+  const id = rowId(r);
+  const names = rowShows.map(s => escComment(s.title || s.presenter || 'Untitled')).join(' | ');
+  return `<!-- Row ${r + 1}: ${names} -->
+<tr id="layout-row${id}" class="layout layout-row clear-this " style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+${column(rowShows[0], id, 0)}
+<td id="layout_table_sb${id}_pair" valign="top" width="450" style="mso-line-height-rule: exactly;">
+<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="450" style="${TABLE_STYLE}">
+<tr id="layout-row${id + 1}" class="layout layout-row clear-this " style="mso-line-height-rule: exactly;">
+<td id="layout-row-padding${id + 1}" valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+${column(rowShows[1], id, 1)}
+${column(rowShows[2], id, 2)}
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function spacerRow(height) {
+  return `<tr style="mso-line-height-rule: exactly;">
+<td valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr class="layout layout-row widget _widget_spacer " style="mso-line-height-rule: exactly;">
+<td valign="top" style="mso-line-height-rule: exactly;">
+<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td valign="top" height="${height}" style="mso-line-height-rule: exactly;">
+<div class="spacer" style="margin: 0; outline: none; padding: 0; height: ${height}px;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLE_STYLE}">
+<tr style="mso-line-height-rule: exactly;">
+<td class="spacer-body" valign="top" height="${height}" width="675" style="mso-line-height-rule: exactly;">&nbsp;</td>
+</tr>
+</table>
+</div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>`;
+}
+
+function buildBlocks() {
+  const rows = [];
+  for (let i = 0; i < shows.length; i += PER_ROW) rows.push(shows.slice(i, i + PER_ROW));
+  return rows.map((rowShows, r) => squareRow(rowShows, r)).join('\n' + spacerRow(10) + '\n');
+}
+
+function missingImageNote() {
+  const n = shows.filter(s => !s.imgUrl).length;
+  return n ? ` ⚠ ${n} show${n > 1 ? 's' : ''} still need an image — search for INSERT_IMAGE_URL_HERE.` : '';
+}
+
+function generateHTML() {
+  const out = document.getElementById('html-output');
+  const hint = document.getElementById('output-hint');
+  if (!shows.length) {
+    out.value = '';
+    hint.textContent = '';
+    refreshPreview();
+    return;
+  }
+  const rowCount = Math.ceil(shows.length / PER_ROW);
+  out.value = `<!-- Square blocks (${shows.length} show${shows.length > 1 ? 's' : ''}, ${rowCount} row${rowCount > 1 ? 's' : ''}) — paste inside the email's main 675px table. -->\n` + buildBlocks();
+  hint.textContent = "Paste these rows into the email's main 675px table." + missingImageNote();
+  refreshPreview();
+}
+
+// Preview renders the blocks in an iframe (wrapped in a bare 675px table) so
+// their styles can't leak into this page.
+const PREVIEW_WIDTH = 700; // a little wider than the 675px email
+const PLACEHOLDER_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="185" height="185"><rect width="185" height="185" fill="#e4e6e7"/><text x="92.5" y="97" font-family="Arial" font-size="13" fill="#8a8f92" text-anchor="middle">No image yet</text></svg>');
+
+function fitPreview() {
+  const wrap = document.getElementById('preview-wrap');
+  const frame = document.getElementById('preview-frame');
+  const scale = Math.min(1, wrap.clientWidth / PREVIEW_WIDTH) || 1;
+  frame.style.width = PREVIEW_WIDTH + 'px';
+  frame.style.height = (wrap.clientHeight / scale) + 'px';
+  frame.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitPreview);
+
+function refreshPreview() {
+  if (!document.getElementById('tab-preview').classList.contains('active')) return;
+  fitPreview();
+  const frame = document.getElementById('preview-frame');
+  if (!shows.length) {
+    frame.srcdoc = '<p style="font-family:sans-serif;color:#aaa;font-size:13px;text-align:center;padding:40px 0;">Load shows to see a preview.</p>';
+    return;
+  }
+  // Preview only: show a grey "No image yet" square instead of a broken image.
+  const blocks = buildBlocks().replaceAll('src="INSERT_IMAGE_URL_HERE"', `src="${PLACEHOLDER_IMG}"`);
+  frame.srcdoc = `<body style="margin:0;font-family:arial;"><table width="675" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;max-width:675px;">${blocks}</table><\/body>`; // "<\/" so Live Server doesn't inject its reload script here
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function switchTab(tab, el) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tab-code, #tab-preview').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  refreshPreview();
+}
+
+function copyHTML() {
+  const ta = document.getElementById('html-output');
+  const text = ta.value;
+  if (!text.trim()) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#1a7a3c'; btn.style.color = '#fff'; btn.style.border = 'none';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }, 2200);
+  }).catch(() => {
+    ta.select(); document.execCommand('copy');
+  });
+}
+
+function downloadHTML() {
+  const content = document.getElementById('html-output').value;
+  if (!content.trim()) { setStatus('Load shows first.', 'error'); return; }
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `square-blocks-${new Date().toISOString().slice(0, 10)}.html`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function escHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escAttr(s) { return escHtml(s).replace(/"/g, '&quot;'); }
+function escComment(s) { return (s || '').replace(/--/g, '—'); }
+</script>
+</body>
+</html>

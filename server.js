@@ -8,6 +8,21 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Lets the page call the API even when it's opened from somewhere other than
+// this server (VS Code Live Server, or index.html opened directly, whose
+// origin is "null"). Only local origins are allowed.
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (origin === 'null' || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── SSRF guard ───────────────────────────────────────────────────────────────
@@ -250,6 +265,61 @@ app.post('/api/fetch-page-images', async (req, res) => {
   }
 });
 
+// ── /api/event-details ───────────────────────────────────────────────────────
+// Reads the show info from the heading of an attpac.org event page (used by
+// the Wide Blocks, Square Blocks and feature tools). Every attpac.org event page marks these fields with the
+// same eventHeading__* classes.
+
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', ndash: '–', mdash: '—', hellip: '…',
+};
+
+function htmlToText(fragment) {
+  return fragment
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function eventHeadingField(html, cls) {
+  const m = html.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>([\\s\\S]*?)</(?:p|h1|h2|div)>`, 'i'));
+  return m ? htmlToText(m[1]) : '';
+}
+
+app.post('/api/event-details', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  try {
+    const html = await fetchPageHtml(url);
+    const presenter = eventHeadingField(html, 'eventHeading__preheading');
+    let title = eventHeadingField(html, 'eventHeading__title');
+    // Some pages repeat the presenter at the start of the title
+    // ("TITAS/DANCE UNBOUND Presents Ballets Jazz…") — drop the repeat.
+    if (presenter && title.toLowerCase().startsWith(presenter.toLowerCase() + ' ')) {
+      title = title.slice(presenter.length).trim();
+    }
+    if (!title) {
+      return res.status(422).json({ error: 'Could not find the show info on that page. Is it an attpac.org event page?' });
+    }
+    res.json({
+      presenter,
+      title,
+      dates: eventHeadingField(html, 'eventHeading__dates'),
+      venue: eventHeadingField(html, 'eventHeading__venue-name'),
+      description: eventHeadingField(html, 'eventHeading__short-description'),
+      imageUrl: extractCarouselImage(html, url),
+    });
+  } catch (err) {
+    console.error('Event details error:', err.message);
+    res.status(500).json({ error: err.message || 'Could not reach that page. Check the URL and try again.' });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`\n  OAC Rush Generator running at http://localhost:${PORT}\n`);
+  console.log(`\n  Email Tools running at http://localhost:${PORT}\n`);
 });

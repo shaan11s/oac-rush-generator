@@ -1,7 +1,7 @@
 {
-  "name": "oac-rush-generator",
+  "name": "culture-calendar-generator",
   "version": "1.0.0",
-  "description": "OAC Rush email HTML generator for AT&T PAC",
+  "description": "Culture Calendar email HTML generator for AT&T PAC",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

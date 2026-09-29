@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Culture Calendar HTML Generator — AT&T PAC</title>
+<script src="../../vendor/xlsx.full.min.js"></script>
+<script src="preset-images.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c60223;
+    --red-dark: #a0011c;
+    --gray-50: #f8f8f8;
+    --gray-100: #f0f0f0;
+    --gray-200: #e0e0e0;
+    --gray-400: #aaaaaa;
+    --gray-600: #666666;
+    --gray-800: #222222;
+    --green: #1a7a3c;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', 'Courier New', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: var(--font);
+    background: #f4f3f0;
+    color: var(--gray-800);
+    min-height: 100vh;
+    padding: 0 0 24px; /* matches the output card's bottom gap so it never slides under the header */
+  }
+
+  header {
+    background: #1a1a1a;
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--red);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-logo svg { width: 22px; height: 22px; }
+  .header-title { color: #fff; font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { color: #888; font-size: 13px; margin-top: 1px; }
+  .header-home {
+    margin-left: auto;
+    color: #bbb; font-size: 13px; font-weight: 500;
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #444; border-radius: var(--radius);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .header-home:hover { color: #fff; border-color: var(--red); }
+
+  /* Steps 1 + 2 stacked on the left; generated HTML on the right, pinned
+     below the sticky header so it stays in view while the left side scrolls. */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px 24px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .left-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .output-card {
+    position: sticky;
+    top: 104px;
+    height: calc(100vh - 128px);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+  }
+  .output-card .card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .output-card .tab-panel.active { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .output-card #html-output { flex: 1; height: auto; min-height: 0; resize: none; }
+  .output-card #preview-frame { flex: 1; max-height: none; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    .output-card { position: static; height: auto; min-height: 0; }
+    .output-card #html-output { height: 340px; flex: none; resize: vertical; }
+    .output-card #preview-frame { max-height: 70vh; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 14px 20px; }
+  }
+
+  .card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+  .step-badge {
+    width: 22px; height: 22px;
+    background: var(--red); color: #fff;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-body { padding: 16px 18px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    line-height: 1.55;
+    resize: vertical;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  textarea:focus, input[type="text"]:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(198,2,35,0.1);
+    background: #fff;
+  }
+  textarea.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  label.field-label {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px; font-weight: 600; font-family: var(--font);
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-secondary { background: var(--gray-100); color: var(--gray-800); border: 1px solid var(--gray-200); }
+  .btn-secondary:hover { background: var(--gray-200); }
+  .btn-ghost { background: transparent; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); color: var(--gray-800); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status { font-size: 13px; color: var(--gray-600); margin-top: 8px; min-height: 20px; }
+  .status.error { color: var(--red); }
+  .status.success { color: var(--green); }
+
+  /* ── Show cards ── */
+  .show-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  /* Show cards scroll inside the card so the page doesn't grow with every
+     show and the Generate HTML button stays in reach. */
+  #shows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+  }
+  .show-card { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .show-card-head {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .show-num {
+    background: var(--red); color: #fff;
+    border-radius: 10px;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+  }
+  .show-card-head .show-name { color: #ccc; font-size: 12px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .show-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--gray-50);
+  }
+  .show-fields .field-full { grid-column: 1 / -1; }
+
+  /* ── Image fetch row ── */
+  .img-fetch-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .img-fetch-row input { flex: 1; }
+  .preset-select {
+    width: 100%;
+    margin-top: 6px;
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+  }
+  .preset-select:focus { outline: none; border-color: var(--red); }
+
+  /* status pill on each show */
+  .img-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .img-status.found { background: #d4f0de; color: #0e5a28; }
+  .img-status.missing { background: #fde8e8; color: #a0011c; }
+  .img-status.loading { background: #fff3cd; color: #7a5800; }
+
+  /* image thumb */
+  .img-thumb {
+    width: 48px; height: 36px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--gray-200);
+    display: block;
+    flex-shrink: 0;
+  }
+  .img-thumb-placeholder {
+    width: 48px; height: 36px;
+    background: var(--gray-200);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ── Output ── */
+  #html-output {
+    height: 340px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    background: #f6f6fa;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    resize: vertical;
+    width: 100%;
+    outline: none;
+    color: #334;
+  }
+  #html-output:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(198,2,35,0.1); }
+
+  #preview-frame {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    min-height: 200px;
+    max-height: 70vh;
+    background: #fff;
+    padding: 12px 16px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 12px; }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    color: var(--gray-600); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .tab.active { color: var(--red); border-bottom-color: var(--red); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gray-400); font-size: 13px;
+  }
+  .empty-state svg { width: 36px; height: 36px; stroke: var(--gray-200); fill: none; margin: 0 auto 10px; display: block; }
+
+  .section-hint { font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+
+  /* ── Image picker modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .modal {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    width: 100%; max-width: 620px;
+    max-height: 88vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .modal-header h3 { font-size: 14px; font-weight: 600; }
+  .modal-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; line-height: 1; color: var(--gray-600); padding: 2px 6px;
+  }
+  .modal-close:hover { color: var(--gray-800); }
+  .modal-body { padding: 16px 18px; overflow-y: auto; }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  .gallery-thumb-btn {
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 0;
+    cursor: pointer;
+    background: var(--gray-50);
+    overflow: hidden;
+    aspect-ratio: 622 / 350;
+    transition: border-color 0.15s;
+  }
+  .gallery-thumb-btn:hover { border-color: var(--red); }
+  .gallery-thumb-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .crop-viewport {
+    position: relative;
+    overflow: hidden;
+    background: #111;
+    border-radius: var(--radius);
+    margin: 0 auto;
+    cursor: grab;
+    touch-action: none;
+  }
+  .crop-viewport.dragging { cursor: grabbing; }
+  .crop-viewport img { position: absolute; user-select: none; -webkit-user-drag: none; }
+  .crop-zoom-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .crop-zoom-row input[type="range"] { flex: 1; }
+  .crop-hint { font-size: 12px; color: var(--gray-400); text-align: center; margin-top: 8px; }
+
+  .modal-loading { text-align: center; padding: 30px 10px; color: var(--gray-600); font-size: 13px; }
+
+  /* fetch-all banner */
+  .fetch-all-bar {
+    display: none;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    align-items: center;
+    gap: 10px;
+  }
+  .fetch-all-bar p { font-size: 13px; color: #5a4000; flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <path d="M3 9h18M8 4v5M16 4v5"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">Culture Calendar HTML Generator</div>
+    <div class="header-sub">AT&amp;T Performing Arts Center — Internal Tool</div>
+  </div>
+  <a class="header-home" href="../../index.html">&larr; All tools</a>
+</header>
+
+<main>
+
+  <div class="left-col">
+  <!-- Step 1 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <h2>Add Shows</h2>
+    </div>
+    <div class="card-body">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchInputTab('email', this)">Paste Email</div>
+        <div class="tab" onclick="switchInputTab('excel', this)">Upload Excel</div>
+        <div class="tab" onclick="switchInputTab('html', this)">Import HTML</div>
+      </div>
+
+      <div id="input-email" class="tab-panel active">
+        <label class="field-label">Email body text</label>
+        <textarea id="email-input" rows="14" placeholder="Paste the Culture Calendar email (or just one show block) here. The parser finds each https://attpac.org/event/ link and reads the fields above it:
+
+Presenter Name
+Show Title
+Dates
+Venue
+$XX
+Learn More
+https://attpac.org/event/show-slug"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="parseEmail()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            Parse Shows
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="loadSample()">Load sample</button>
+        </div>
+      </div>
+
+      <div id="input-excel" class="tab-panel">
+        <label class="field-label">Excel file (.xlsx, .xls, .csv)</label>
+        <div class="btn-row" style="margin-top:0;">
+          <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" autocomplete="off" onchange="handleExcelFile(this.files[0])">
+        </div>
+        <p class="section-hint">One show per row, columns in this order: <strong>Presenter, Title, Subtitle, Date&nbsp;Text, Venue, CTA, Link</strong>. A header row is fine — it's detected and skipped automatically.</p>
+      </div>
+
+      <div id="input-html" class="tab-panel">
+        <label class="field-label">Existing HTML</label>
+        <textarea id="html-import-input" class="mono" rows="12" placeholder="Paste HTML this tool generated earlier (or a whole email containing those show blocks). Each show is loaded into the cards on the right so you can edit it and generate fresh HTML."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="importHTML(document.getElementById('html-import-input').value)">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            Load Shows
+          </button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+            Open .html file…
+            <input type="file" id="html-file-input" accept=".html,.htm,.txt" autocomplete="off" style="display:none;" onchange="handleHtmlFile(this.files[0])">
+          </label>
+        </div>
+      </div>
+
+      <p class="status" id="parse-status"></p>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <h2>Review &amp; Fetch Images</h2>
+    </div>
+    <div class="card-body">
+      <div id="fetch-all-bar" class="fetch-all-bar">
+        <p>Ready to auto-fetch show images from each event page.</p>
+        <button class="btn btn-primary btn-sm" id="fetch-all-btn" onclick="fetchAllImages()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          Fetch All Images
+        </button>
+      </div>
+      <div id="shows-container">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Parsed shows will appear here.
+        </div>
+      </div>
+      <div class="btn-row" id="regen-row" style="display:none;">
+        <button class="btn btn-primary" onclick="generateHTML()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Generate HTML
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="addShowCard()">+ Add show</button>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- Step 3 -->
+  <div class="card output-card">
+    <div class="card-header">
+      <div class="step-badge">3</div>
+      <h2>Generated HTML</h2>
+      <div style="margin-left:auto; display:flex; gap:8px;" id="output-actions">
+        <button class="btn btn-secondary btn-sm" onclick="copyHTML()" id="copy-btn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy HTML
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHTML()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .html
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('code', this)">HTML Code</div>
+        <div class="tab" onclick="switchTab('preview', this)">Preview</div>
+      </div>
+      <div id="tab-code" class="tab-panel active">
+        <textarea id="html-output" class="mono" readonly placeholder="HTML will appear here after parsing..."></textarea>
+        <p class="section-hint">Paste this block into your ActiveCampaign template between the header and footer table rows. Images without a fetched URL still show INSERT_IMAGE_URL_HERE so you can swap them manually.</p>
+      </div>
+      <div id="tab-preview" class="tab-panel">
+        <div id="preview-frame">
+          <p style="color:#aaa; font-size:13px; text-align:center; padding:40px 0;">Preview will appear after generating HTML.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Image picker / crop modal -->
+<div id="image-modal-backdrop" class="modal-backdrop" style="display:none;" onclick="if(event.target===this) closeImageModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Choose an image</h3>
+      <button class="modal-close" onclick="closeImageModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const SAMPLE = `We are sending out a Culture Calendar on, Tuesday, 5/26, with the following shows:
+
+Books-A-Million Presents
+An Evening with Elsie Silver: Fever Dream
+May 26
+Wyly Theatre
+$25
+Learn More
+https://attpac.org/event/elsie-silver
+
+TITAS/DANCE UNBOUND, in association with AT&T Performing Arts Center, Presents
+GALLIM
+May 29 - 30
+Moody Performance Hall
+$25
+Learn More
+https://attpac.org/event/gallim
+
+Toby's School of Dance and Richardson Fine Arts Conservatory Present
+Tangled In All That Hair
+May 30
+Moody Performance Hall
+$25
+Learn More
+https://attpac.org/event/tangled-in-all-that-hair
+
+Dallas Theater Center Presents
+Malcolm X and Redd Foxx Washing Dishes at Jimmy's Chicken Shack in Harlem
+Now – Jun 7
+Wyly Studio Theatre
+$25
+Learn More
+https://attpac.org/event/dtc-malcolm-x-and-redd-foxx`;
+
+// Image fetching needs the tool's own Node server (npm start, port 3000). If
+// the page was opened some other way — VS Code Live Server, or the file
+// directly — send those requests to port 3000 instead of the current origin.
+const API_BASE = location.protocol.startsWith('http') && location.port === '3000' ? '' : 'http://localhost:3000';
+
+let parsedShows = [];
+let showCounter = 0;
+
+function loadSample() {
+  document.getElementById('email-input').value = SAMPLE;
+  setStatus('parse-status', '');
+}
+
+// ── Input method tabs (Paste Email / Upload Excel) ─────────────────────────────
+
+function switchInputTab(which, el) {
+  document.querySelectorAll('#input-email, #input-excel, #input-html').forEach(p => p.classList.remove('active'));
+  document.getElementById('input-' + which).classList.add('active');
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  setStatus('parse-status', '');
+}
+
+function finishParsedShows(shows, sourceLabel, hint = 'Click "Fetch All Images" to auto-pull photos.') {
+  if (!shows.length) {
+    setStatus('parse-status', 'No shows found. Check the format and try again.', 'error');
+    return;
+  }
+  parsedShows = shows;
+  renderShowCards();
+  generateHTML();
+  setStatus('parse-status', `✓ Found ${shows.length} show${shows.length > 1 ? 's' : ''}${sourceLabel ? ' ' + sourceLabel : ''}. ${hint}`, 'success');
+  document.getElementById('fetch-all-bar').style.display = 'flex';
+}
+
+// ── Excel/CSV parsing ────────────────────────────────────────────────────────
+
+async function handleExcelFile(file) {
+  if (!file) return;
+  if (typeof XLSX === 'undefined') {
+    setStatus('parse-status', 'Excel parser failed to load. Open the tool at http://localhost:3000 (run "npm start" first) rather than opening index.html directly.', 'error');
+    return;
+  }
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', bookFiles: true });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    restoreQuotePrefixes(wb, sheet);
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    // Map columns by their header name rather than fixed position. This
+    // survives extra/reordered/missing columns in the sheet (an earlier
+    // fixed-position approach broke when a sheet had a stray extra column
+    // we didn't know about — the whole point of reading headers is to not
+    // have to guess sheet structure). Falls back to the documented
+    // Presenter/Title/Subtitle/Date Text/Venue/CTA/Link position order
+    // only if no recognizable header row is present.
+    const norm = s => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const HEADER_ALIASES = {
+      presenter: ['presenter'],
+      title: ['title', 'show title'],
+      subtitle: ['subtitle'],
+      dates: ['date text', 'dates', 'date'],
+      venue: ['venue'],
+      cta: ['cta', 'button text', 'button'],
+      url: ['link', 'url', 'button url'],
+    };
+    let colIndex = { presenter: 0, title: 1, subtitle: 2, dates: 3, venue: 4, cta: 5, url: 6 };
+    let dataStart = 0;
+
+    if (rows.length) {
+      const headerRow = rows[0].map(norm);
+      const looksLikeHeader = HEADER_ALIASES.presenter.includes(headerRow[0]) || HEADER_ALIASES.title.includes(headerRow[1]);
+      if (looksLikeHeader) {
+        const found = {};
+        Object.entries(HEADER_ALIASES).forEach(([key, aliases]) => {
+          const idx = headerRow.findIndex(h => aliases.includes(h));
+          if (idx !== -1) found[key] = idx;
+        });
+        if (found.presenter !== undefined && found.title !== undefined) colIndex = found;
+        dataStart = 1;
+      }
+    }
+
+    const shows = [];
+    for (let i = dataStart; i < rows.length; i++) {
+      const cells = rows[i].map(c => String(c ?? '').trim());
+      if (!cells.some(c => c)) continue; // skip blank rows
+
+      const get = key => (colIndex[key] !== undefined ? (cells[colIndex[key]] || '') : '');
+      const presenter = get('presenter');
+      const title = get('title');
+      if (!presenter && !title) continue;
+
+      shows.push({
+        id: ++showCounter,
+        presenter,
+        title,
+        subtitle: get('subtitle'),
+        dates: get('dates'),
+        venue: get('venue'),
+        price: '',
+        cta: get('cta') || 'Learn More',
+        url: get('url'),
+        imgUrl: '',
+        rawImgUrl: '',
+        cropRect: null,
+        whiteBg: false,
+        skipCrop: false,
+        imgAlt: title || presenter,
+      });
+    }
+
+    finishParsedShows(shows, `from "${file.name}"`);
+
+    const badLinks = shows.filter(s => s.url && !/^https?:\/\//i.test(s.url)).length;
+    if (badLinks) {
+      const el = document.getElementById('parse-status');
+      el.textContent += ` ⚠ ${badLinks} row${badLinks > 1 ? 's' : ''} had an unexpected Link column — check column order.`;
+      el.className = 'status error';
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus('parse-status', "Could not read that file. Make sure it's a valid .xlsx/.xls/.csv.", 'error');
+  }
+
+  // Reset so re-selecting the same file always fires 'change' again, and so
+  // a page refresh never leaves a stale filename showing in the picker.
+  document.getElementById('excel-input').value = '';
+}
+
+// ── HTML import (edit previously generated HTML) ─────────────────────────────
+
+async function handleHtmlFile(file) {
+  if (!file) return;
+  const text = await file.text();
+  document.getElementById('html-import-input').value = text;
+  importHTML(text, `from "${file.name}"`);
+  document.getElementById('html-file-input').value = '';
+}
+
+// Reads show blocks back out of HTML produced by showRow() — or a whole email
+// that contains them — and loads them into the show cards. Fields are
+// identified by the inline styles showRow() writes (18px = title, #c60223 =
+// price, etc.), falling back to line order if the styles were stripped.
+function importHTML(html, sourceLabel = 'from HTML') {
+  if (!html || !html.trim()) { setStatus('parse-status', 'Paste some HTML first.', 'error'); return; }
+
+  // Generated output is a run of bare <tr> rows; the HTML parser drops <tr>/<td>
+  // tags that aren't inside a <table>, so wrap it when a <tr> comes first.
+  const firstTr = html.search(/<tr[\s>]/i);
+  const firstTable = html.search(/<table[\s>]/i);
+  const needsWrap = firstTr !== -1 && (firstTable === -1 || firstTr < firstTable);
+  const doc = new DOMParser().parseFromString(needsWrap ? `<table><tbody>${html}</tbody></table>` : html, 'text/html');
+
+  const tdsOf = tr => [...tr.children].filter(c => c.tagName === 'TD');
+  const textCellOf = tr => tdsOf(tr).find(td => td.querySelectorAll('p').length >= 2 && td.querySelector('a[href]'));
+  const candidates = [...doc.querySelectorAll('tr')].filter(tr => tdsOf(tr).length >= 2 && textCellOf(tr));
+  // Keep only the innermost matching rows so layout wrappers aren't counted.
+  const blocks = candidates.filter(tr => !candidates.some(other => other !== tr && tr.contains(other)));
+
+  const clean = s => (s || '').replace(/\s+/g, ' ').trim();
+  const styleOf = el => (el.getAttribute('style') || '').toLowerCase().replace(/\s+/g, '');
+
+  const shows = blocks.map(tr => {
+    const textTd = textCellOf(tr);
+    const imgTd = tdsOf(tr).find(td => td !== textTd && td.querySelector('img'));
+    const img = imgTd && imgTd.querySelector('img');
+
+    let presenter = '', title = '', subtitle = '', price = '';
+    const rest = [];
+    textTd.querySelectorAll('p').forEach(p => {
+      const t = clean(p.textContent);
+      if (!t) return;
+      const s = styleOf(p);
+      if (!price && (s.includes('color:#c60223') || /^\$\s*\d/.test(t))) price = t;
+      else if (!title && s.includes('font-size:18px')) title = t;
+      else if (!subtitle && s.includes('font-size:13px')) subtitle = t;
+      else if (!presenter && s.includes('color:#666')) presenter = t;
+      else rest.push(t);
+    });
+    if (!presenter && !title) { presenter = rest.shift() || ''; title = rest.shift() || ''; }
+    const dates = rest.shift() || '';
+    const venue = rest.shift() || '';
+
+    const links = textTd.querySelectorAll('a[href]');
+    const link = links[links.length - 1];
+    const href = link ? link.getAttribute('href').trim() : '';
+
+    const show = {
+      id: ++showCounter,
+      presenter, title, subtitle, dates, venue, price,
+      cta: clean(link && link.textContent) || 'Learn More',
+      url: href === '#' ? '' : href,
+      imgUrl: '', rawImgUrl: '', cropRect: null, whiteBg: false, skipCrop: false,
+      imgAlt: clean(img && img.getAttribute('alt')).replace(/\s*performance$/i, '') || title || presenter,
+    };
+    Object.assign(show, parseImageSrc(img ? img.getAttribute('src') : ''));
+    return show;
+  });
+
+  if (!shows.length) {
+    setStatus('parse-status', 'No show blocks found in that HTML. It should contain the show rows this tool generates.', 'error');
+    return;
+  }
+  finishParsedShows(shows, sourceLabel, 'Edit anything below, then Generate HTML.');
+  shows.forEach(s => { if (s.imgUrl) setImgStatus(s.id, 'found', '✓ Image loaded'); });
+}
+
+// Works backwards from a generated image URL to the original image + crop
+// settings, so re-cropping / white-background toggles keep working after an
+// import. The generated URL itself is kept as-is so untouched shows come out
+// identical. Unknown URLs are treated as "use as-is" (skip auto-crop).
+function parseImageSrc(src) {
+  src = (src || '').trim();
+  if (!src || src.includes('INSERT_IMAGE_URL_HERE')) return {};
+  let u;
+  try { u = new URL(src); } catch (e) { return { imgUrl: src, rawImgUrl: src, skipCrop: true }; }
+
+  if (/(^|\.)wsrv\.nl$|(^|\.)weserv\.nl$/i.test(u.hostname) && u.searchParams.get('url')) {
+    const p = u.searchParams;
+    let raw = p.get('url');
+    if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+    const hasCrop = ['cx', 'cy', 'cw', 'ch'].every(k => p.has(k));
+    return {
+      imgUrl: src,
+      rawImgUrl: raw,
+      cropRect: hasCrop ? { x: +p.get('cx'), y: +p.get('cy'), w: +p.get('cw'), h: +p.get('ch') } : null,
+      whiteBg: p.get('bg') === 'white',
+      skipCrop: false,
+    };
+  }
+
+  if (u.hostname.includes('imgix.net') && u.searchParams.get('w') === '622' && u.searchParams.get('h') === '350') {
+    return {
+      imgUrl: src,
+      rawImgUrl: u.origin + u.pathname,
+      whiteBg: (u.searchParams.get('bg') || '').toUpperCase() === 'FFFFFF',
+      skipCrop: false,
+    };
+  }
+
+  return { imgUrl: src, rawImgUrl: src, skipCrop: true };
+}
+
+// Excel treats a leading apostrophe (e.g. 'Tis the Season) as a hidden
+// "store as text" marker: it's saved as a quotePrefix style flag, not as part
+// of the cell text, so SheetJS hands back the value without it. This reads
+// the first sheet's raw XML to find those cells and puts the apostrophe back.
+// Only applies to .xlsx — CSV keeps the apostrophe as plain text already.
+function restoreQuotePrefixes(wb, sheet) {
+  try {
+    const xfs = (wb.Styles && wb.Styles.CellXf) || [];
+    if (!wb.files || !xfs.some(xf => xf && xf.quotePrefix)) return;
+
+    const readFile = path => {
+      const f = wb.files[path] || wb.files['/' + path];
+      return f && f.content ? new TextDecoder().decode(f.content) : null;
+    };
+
+    // Resolve the first sheet's XML path via workbook.xml + its rels
+    // (sheet file numbering doesn't necessarily match tab order).
+    const workbookXml = readFile('xl/workbook.xml');
+    const relsXml = readFile('xl/_rels/workbook.xml.rels');
+    if (!workbookXml || !relsXml) return;
+    const firstSheet = workbookXml.match(/<sheet\b[^>]*>/i);
+    const ridM = firstSheet && firstSheet[0].match(/\br:id="([^"]+)"/i);
+    if (!ridM) return;
+    const rel = [...relsXml.matchAll(/<Relationship\b[^>]*>/gi)].map(m => m[0])
+      .find(tag => new RegExp(`\\bId="${ridM[1]}"`).test(tag));
+    const targetM = rel && rel.match(/\bTarget="([^"]+)"/i);
+    if (!targetM) return;
+    const target = targetM[1].startsWith('/') ? targetM[1].slice(1) : 'xl/' + targetM[1];
+    const sheetXml = readFile(target);
+    if (!sheetXml) return;
+
+    for (const m of sheetXml.matchAll(/<c\b[^>]*>/gi)) {
+      const refM = m[0].match(/\br="([A-Z]+\d+)"/);
+      const styleM = m[0].match(/\bs="(\d+)"/);
+      if (!refM || !styleM || !(xfs[+styleM[1]] && xfs[+styleM[1]].quotePrefix)) continue;
+      const cell = sheet[refM[1]];
+      if (!cell || cell.t !== 's' || typeof cell.v !== 'string' || cell.v.startsWith("'")) continue;
+      cell.v = "'" + cell.v;
+      cell.w = cell.v;
+    }
+  } catch (e) {
+    console.warn('Could not restore leading apostrophes:', e);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const excelInput = document.getElementById('excel-input');
+  if (excelInput) excelInput.value = '';
+});
+
+function setStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+// ── Parse ────────────────────────────────────────────────────────────────────
+
+function parseEmail() {
+  const text = document.getElementById('email-input').value.trim();
+  if (!text) { setStatus('parse-status', 'Paste an email first.', 'error'); return; }
+
+  const shows = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  // Find every https:// URL — these are the anchors we parse upward from
+  const urlIndices = lines.reduce((acc, line, i) => {
+    if (/^https?:\/\//i.test(line)) acc.push(i);
+    return acc;
+  }, []);
+
+  if (!urlIndices.length) {
+    setStatus('parse-status', 'No URLs found. Each show block must end with an https:// link.', 'error');
+    return;
+  }
+
+  urlIndices.forEach((urlIdx, showIdx) => {
+    const url = lines[urlIdx];
+    const show = { id: ++showCounter, presenter: '', title: '', subtitle: '', dates: '', venue: '', price: '', cta: 'Learn More', url, imgUrl: '', rawImgUrl: '', cropRect: null, whiteBg: false, skipCrop: false, imgAlt: '' };
+
+    // Collect lines between the previous URL and this one, capped at 9 lines back
+    const prevUrl = showIdx > 0 ? urlIndices[showIdx - 1] : -1;
+    const start = Math.max(prevUrl + 1, urlIdx - 9);
+    const block = lines.slice(start, urlIdx);
+
+    // CTA: the line immediately before the URL (if it's not price/venue/dates)
+    // It's whatever button text they put — "Learn More", "Buy Tickets", etc.
+    if (block.length && !/^\$/.test(block[block.length - 1]) && !/theatre|hall|center|stage|studio|opera/i.test(block[block.length - 1])) {
+      show.cta = block.pop();
+    }
+
+    // Price: last line starting with $
+    if (block.length && /^\$/.test(block[block.length - 1])) {
+      show.price = block.pop();
+    }
+
+    // Venue: last line matching venue keywords
+    if (block.length && /theatre|hall|center|stage|studio|opera/i.test(block[block.length - 1])) {
+      show.venue = block.pop();
+    }
+
+    // Dates: last line with digits or "now"
+    if (block.length && (/\d/.test(block[block.length - 1]) || /^now\b/i.test(block[block.length - 1]))) {
+      show.dates = block.pop();
+    }
+
+    // Title: last remaining line
+    if (block.length) {
+      show.title = block.pop();
+    }
+
+    // Presenter: the single line immediately above the title
+    if (block.length) {
+      show.presenter = block[block.length - 1];
+    }
+
+    // Skip shows where price doesn't look like $XX — likely a parsing misfire
+    if (!show.price || !/^\$\s*\d/.test(show.price)) return;
+
+    show.imgAlt = show.title || show.presenter;
+    shows.push(show);
+  });
+
+  if (!shows.length) {
+    setStatus('parse-status', 'No shows found. Make sure each show has an https:// URL.', 'error');
+    return;
+  }
+
+  finishParsedShows(shows, '');
+}
+
+// ── Image sizing ─────────────────────────────────────────────────────────────
+// Every image that ends up in the output HTML is normalized to AT&T's
+// finalized template size — 622x350 — regardless of source. AT&T's own
+// imgix-hosted photos are cropped via imgix's own params (proven pipeline,
+// keeps full quality). Everything else (any 3rd-party page) is routed
+// through wsrv.nl, a free image proxy, which fetches the source image and
+// crops/resizes it on the fly — no server-side storage needed.
+//
+// `crop`, if given, is a manual rectangle in the SOURCE image's natural
+// pixel space: { x, y, w, h }. Omit it for automatic "smart" cropping
+// (entropy/skin-tone/saturation-based focal point).
+function buildDisplayImageUrl(rawUrl, crop, whiteBg) {
+  if (!rawUrl) return rawUrl;
+
+  let isImgix = false;
+  try { isImgix = new URL(rawUrl).hostname.includes('imgix.net'); } catch (e) {}
+
+  if (isImgix && !crop) {
+    const u = new URL(rawUrl);
+    u.search = '';
+    u.searchParams.set('fit', 'crop');
+    u.searchParams.set('crop', 'faces,entropy,center');
+    u.searchParams.set('q', '70');
+    u.searchParams.set('auto', 'format');
+    u.searchParams.set('or', '0');
+    u.searchParams.set('fm', 'jpeg');
+    u.searchParams.set('w', '622');
+    u.searchParams.set('h', '350');
+    if (whiteBg) u.searchParams.set('bg', 'FFFFFF');
+    return u.toString();
+  }
+
+  const bare = rawUrl.replace(/^https?:\/\//, '');
+  const params = new URLSearchParams();
+  params.set('url', bare);
+  params.set('w', '622');
+  params.set('h', '350');
+  params.set('fit', 'cover');
+  params.set('output', 'jpg');
+  params.set('q', '75');
+  if (crop) {
+    params.set('cx', String(Math.round(crop.x)));
+    params.set('cy', String(Math.round(crop.y)));
+    params.set('cw', String(Math.round(crop.w)));
+    params.set('ch', String(Math.round(crop.h)));
+    params.set('precrop', 'true');
+  } else {
+    params.set('a', 'attention');
+  }
+  if (whiteBg) params.set('bg', 'white');
+  return `https://wsrv.nl/?${params.toString()}`;
+}
+
+// ── Image fetching (auto — bulk & single) ──────────────────────────────────
+
+async function fetchAllImages() {
+  const showsToFetch = parsedShows.filter(s => s.url);
+  const urls = showsToFetch.map(s => s.url);
+  if (!urls.length) return;
+
+  const btn = document.getElementById('fetch-all-btn');
+  btn.disabled = true;
+  btn.textContent = 'Fetching…';
+
+  parsedShows.forEach(s => setImgStatus(s.id, 'loading', 'Fetching…'));
+
+  try {
+    const res = await fetch(API_BASE + '/api/fetch-all-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    });
+    const data = await res.json();
+
+    data.results.forEach(({ imageUrl, error }, i) => {
+      const show = showsToFetch[i];
+      if (!show) return;
+      if (imageUrl) {
+        const finalUrl = show.skipCrop ? imageUrl : buildDisplayImageUrl(imageUrl, null, show.whiteBg);
+        show.imgUrl = finalUrl;
+        show.rawImgUrl = imageUrl;
+        show.cropRect = null;
+        setImgStatus(show.id, 'found', '✓ Image found');
+        updateImgField(show.id, finalUrl);
+        updateThumb(show.id, finalUrl);
+      } else {
+        setImgStatus(show.id, 'missing', error || 'No image found');
+      }
+    });
+
+    generateHTML();
+  } catch (e) {
+    setStatus('parse-status', 'Image fetch failed — make sure the server is running at localhost:3000, not opening the file directly.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg> Fetch All Images`;
+}
+
+async function fetchOneImage(id) {
+  const show = parsedShows.find(s => s.id === id);
+  if (!show || !show.url) return;
+
+  setImgStatus(id, 'loading', 'Fetching…');
+  const btn = document.getElementById('fetch-btn-' + id);
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(API_BASE + '/api/fetch-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: show.url }),
+    });
+    const data = await res.json();
+    if (data.imageUrl) {
+      const finalUrl = show.skipCrop ? data.imageUrl : buildDisplayImageUrl(data.imageUrl, null, show.whiteBg);
+      show.imgUrl = finalUrl;
+      show.rawImgUrl = data.imageUrl;
+      show.cropRect = null;
+      setImgStatus(id, 'found', '✓ Image found');
+      updateImgField(id, finalUrl);
+      updateThumb(id, finalUrl);
+      generateHTML();
+    } else {
+      setImgStatus(id, 'missing', data.error || data.message || 'No image found');
+    }
+  } catch (e) {
+    setImgStatus(id, 'missing', 'Server error');
+  }
+  if (btn) btn.disabled = false;
+}
+
+// ── Image gallery + crop modal ───────────────────────────────────────────────
+
+let galleryState = null; // { showId, images }
+let cropState = null;    // { showId, rawUrl, naturalW, naturalH, viewportW, viewportH, baseScale, zoomFactor, scale, offsetX, offsetY }
+
+function openImageModal() { document.getElementById('image-modal-backdrop').style.display = 'flex'; }
+function closeImageModal() {
+  document.getElementById('image-modal-backdrop').style.display = 'none';
+  galleryState = null;
+  cropState = null;
+}
+
+async function openImageGallery(showId) {
+  const show = parsedShows.find(s => s.id === showId);
+  if (!show || !show.url) { alert('Add a link for this show first.'); return; }
+
+  document.getElementById('modal-title').textContent = 'Choose an image';
+  document.getElementById('modal-body').innerHTML = '<p class="modal-loading">Loading images from the page…</p>';
+  openImageModal();
+
+  try {
+    const res = await fetch(API_BASE + '/api/fetch-page-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: show.url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load images.');
+
+    galleryState = { showId, images: data.images || [] };
+    renderGalleryGrid();
+  } catch (e) {
+    document.getElementById('modal-body').innerHTML = `<p class="modal-loading">${escText(e.message || 'Could not load images from that page.')}</p>`;
+  }
+}
+
+function renderGalleryGrid() {
+  document.getElementById('modal-title').textContent = 'Choose an image';
+  const body = document.getElementById('modal-body');
+  if (!galleryState || !galleryState.images.length) {
+    body.innerHTML = '<p class="modal-loading">No images found on that page. Paste an image URL manually instead.</p>';
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'gallery-grid';
+  galleryState.images.forEach((url, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'gallery-thumb-btn';
+    btn.type = 'button';
+    btn.onclick = () => startCrop(url, galleryState.showId);
+    btn.innerHTML = `<img src="${escAttr(url)}" loading="lazy" alt="Option ${i + 1}" onerror="this.closest('.gallery-thumb-btn').style.display='none';">`;
+    grid.appendChild(btn);
+  });
+  body.innerHTML = '';
+  body.appendChild(grid);
+}
+
+function backToGallery() {
+  cropState = null;
+  renderGalleryGrid();
+}
+
+const CROP_RATIO = 622 / 350;
+
+function startCrop(rawUrl, showId) {
+  document.getElementById('modal-title').textContent = 'Crop image (622 × 350)';
+  const body = document.getElementById('modal-body');
+  const backBtn = galleryState ? '<button class="btn btn-ghost btn-sm" onclick="backToGallery()">&larr; Back</button>' : '';
+  body.innerHTML = `
+    <div class="crop-viewport" id="crop-viewport">
+      <img id="crop-img" src="${escAttr(rawUrl)}" draggable="false">
+    </div>
+    <div class="crop-zoom-row">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M21 21l-4.35-4.35"/><path d="M7 10h6"/></svg>
+      <input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1" oninput="onCropZoom(this.value)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M21 21l-4.35-4.35"/><path d="M10 7v6M7 10h6"/></svg>
+    </div>
+    <p class="crop-hint">Drag to reposition, use the slider to zoom.</p>
+    <div class="btn-row">
+      ${backBtn}
+      <button class="btn btn-secondary btn-sm" onclick="useSmartCrop()">Use smart auto-crop instead</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmCrop()">Use this crop</button>
+    </div>`;
+
+  const viewport = document.getElementById('crop-viewport');
+  const img = document.getElementById('crop-img');
+
+  const vw = Math.min(520, body.clientWidth || 520);
+  const vh = vw / CROP_RATIO;
+  viewport.style.width = vw + 'px';
+  viewport.style.height = vh + 'px';
+
+  cropState = { rawUrl, showId, viewportW: vw, viewportH: vh, zoomFactor: 1 };
+
+  img.onload = () => {
+    cropState.naturalW = img.naturalWidth;
+    cropState.naturalH = img.naturalHeight;
+    cropState.baseScale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
+    cropState.scale = cropState.baseScale;
+    const dispW = img.naturalWidth * cropState.scale;
+    const dispH = img.naturalHeight * cropState.scale;
+    cropState.offsetX = (vw - dispW) / 2;
+    cropState.offsetY = (vh - dispH) / 2;
+    applyCropTransform();
+    document.getElementById('crop-zoom').value = 1;
+  };
+  img.onerror = () => {
+    document.getElementById('modal-body').innerHTML = '<p class="modal-loading">Could not load that image. Try a different one.</p><div class="btn-row"><button class="btn btn-ghost btn-sm" onclick="backToGallery()">&larr; Back</button></div>';
+  };
+
+  wireCropDrag(viewport);
+}
+
+function applyCropTransform() {
+  const img = document.getElementById('crop-img');
+  if (!img || !cropState || !cropState.naturalW) return;
+  const dispW = cropState.naturalW * cropState.scale;
+  const dispH = cropState.naturalH * cropState.scale;
+  img.style.width = dispW + 'px';
+  img.style.height = dispH + 'px';
+  img.style.left = cropState.offsetX + 'px';
+  img.style.top = cropState.offsetY + 'px';
+}
+
+function clampCropOffset() {
+  const dispW = cropState.naturalW * cropState.scale;
+  const dispH = cropState.naturalH * cropState.scale;
+  cropState.offsetX = Math.min(0, Math.max(cropState.viewportW - dispW, cropState.offsetX));
+  cropState.offsetY = Math.min(0, Math.max(cropState.viewportH - dispH, cropState.offsetY));
+}
+
+function onCropZoom(val) {
+  if (!cropState || !cropState.naturalW) return;
+  const newScale = cropState.baseScale * parseFloat(val);
+  // Keep the point currently at the viewport center fixed while zooming
+  const cx = cropState.viewportW / 2, cy = cropState.viewportH / 2;
+  const natX = (cx - cropState.offsetX) / cropState.scale;
+  const natY = (cy - cropState.offsetY) / cropState.scale;
+  cropState.scale = newScale;
+  cropState.offsetX = cx - natX * newScale;
+  cropState.offsetY = cy - natY * newScale;
+  clampCropOffset();
+  applyCropTransform();
+}
+
+function wireCropDrag(viewport) {
+  let dragging = false, startX = 0, startY = 0, startOffX = 0, startOffY = 0;
+
+  viewport.onpointerdown = (e) => {
+    if (!cropState || !cropState.naturalW) return;
+    dragging = true;
+    viewport.classList.add('dragging');
+    viewport.setPointerCapture(e.pointerId);
+    startX = e.clientX; startY = e.clientY;
+    startOffX = cropState.offsetX; startOffY = cropState.offsetY;
+  };
+  viewport.onpointermove = (e) => {
+    if (!dragging) return;
+    cropState.offsetX = startOffX + (e.clientX - startX);
+    cropState.offsetY = startOffY + (e.clientY - startY);
+    clampCropOffset();
+    applyCropTransform();
+  };
+  const stop = (e) => { dragging = false; viewport.classList.remove('dragging'); };
+  viewport.onpointerup = stop;
+  viewport.onpointercancel = stop;
+}
+
+function useSmartCrop() {
+  if (!cropState) return;
+  const show = parsedShows.find(s => s.id === cropState.showId);
+  const finalUrl = buildDisplayImageUrl(cropState.rawUrl, null, show && show.whiteBg);
+  applyChosenImage(finalUrl, null);
+}
+
+function confirmCrop() {
+  if (!cropState || !cropState.naturalW) return;
+  const rect = {
+    x: -cropState.offsetX / cropState.scale,
+    y: -cropState.offsetY / cropState.scale,
+    w: cropState.viewportW / cropState.scale,
+    h: cropState.viewportH / cropState.scale,
+  };
+  rect.x = Math.max(0, Math.min(rect.x, cropState.naturalW - rect.w));
+  rect.y = Math.max(0, Math.min(rect.y, cropState.naturalH - rect.h));
+  const show = parsedShows.find(s => s.id === cropState.showId);
+  const finalUrl = buildDisplayImageUrl(cropState.rawUrl, rect, show && show.whiteBg);
+  applyChosenImage(finalUrl, rect);
+}
+
+function applyChosenImage(finalUrl, cropRect) {
+  const showId = cropState ? cropState.showId : (galleryState && galleryState.showId);
+  const show = parsedShows.find(s => s.id === showId);
+  if (show) {
+    show.imgUrl = finalUrl;
+    if (cropState) show.rawImgUrl = cropState.rawUrl;
+    show.cropRect = cropRect || null;
+    setImgStatus(show.id, 'found', '✓ Image selected');
+    updateImgField(show.id, finalUrl);
+    updateThumb(show.id, finalUrl);
+    generateHTML();
+  }
+  closeImageModal();
+}
+
+function setImgStatus(id, state, msg) {
+  const el = document.getElementById('img-status-' + id);
+  if (el) { el.textContent = msg; el.className = 'img-status ' + state; }
+}
+
+function updateImgField(id, url) {
+  const el = document.getElementById('img-url-' + id);
+  if (el) el.value = url;
+}
+
+function updateThumb(id, url) {
+  const thumb = document.getElementById('img-thumb-' + id);
+  const placeholder = document.getElementById('img-thumb-placeholder-' + id);
+  if (url) {
+    if (thumb) { thumb.src = url; thumb.style.display = 'block'; }
+    if (placeholder) placeholder.style.display = 'none';
+  } else {
+    if (thumb) { thumb.removeAttribute('src'); thumb.style.display = 'none'; }
+    if (placeholder) placeholder.style.display = 'flex';
+  }
+  syncPresetSelect(id);
+}
+
+// ── Render show cards ────────────────────────────────────────────────────────
+
+function renderShowCards() {
+  const container = document.getElementById('shows-container');
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'show-list';
+  parsedShows.forEach(show => list.appendChild(makeShowCard(show)));
+  container.appendChild(list);
+  // Shows that already have an image (imported HTML, or re-render after a
+  // removal) need their thumbnail drawn.
+  parsedShows.forEach(show => { if (show.imgUrl) updateThumb(show.id, show.imgUrl); });
+  document.getElementById('regen-row').style.display = 'flex';
+}
+
+function makeShowCard(show) {
+  const card = document.createElement('div');
+  card.className = 'show-card';
+  card.id = 'show-card-' + show.id;
+  const idx = parsedShows.indexOf(show);
+  card.innerHTML = `
+    <div class="show-card-head">
+      <span class="show-num">Show ${idx + 1}</span>
+      <span class="show-name">${escText(show.presenter || 'Untitled')}</span>
+      <button onclick="removeShow(${show.id})" style="margin-left:8px;background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;padding:0 4px;" title="Remove">×</button>
+    </div>
+    <div class="show-fields">
+      <div>
+        <label class="field-label">Presenter</label>
+        <input type="text" value="${escAttr(show.presenter)}" oninput="updateShow(${show.id},'presenter',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Show Title</label>
+        <input type="text" value="${escAttr(show.title)}" oninput="updateShow(${show.id},'title',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Subtitle</label>
+        <input type="text" value="${escAttr(show.subtitle)}" oninput="updateShow(${show.id},'subtitle',this.value)" placeholder="Optional">
+      </div>
+      <div>
+        <label class="field-label">Dates</label>
+        <input type="text" value="${escAttr(show.dates)}" oninput="updateShow(${show.id},'dates',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Venue</label>
+        <input type="text" value="${escAttr(show.venue)}" oninput="updateShow(${show.id},'venue',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Price</label>
+        <input type="text" value="${escAttr(show.price)}" oninput="updateShow(${show.id},'price',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Button Text</label>
+        <input type="text" value="${escAttr(show.cta || 'Learn More')}" oninput="updateShow(${show.id},'cta',this.value)" placeholder="Learn More">
+      </div>
+      <div>
+        <label class="field-label">Image Alt Text</label>
+        <input type="text" value="${escAttr(show.imgAlt)}" oninput="updateShow(${show.id},'imgAlt',this.value)" placeholder="e.g. GALLIM dancers on stage">
+      </div>
+      <div class="field-full">
+        <label class="field-label">Button URL</label>
+        <input type="text" value="${escAttr(show.url)}" oninput="updateShow(${show.id},'url',this.value)">
+      </div>
+      <div class="field-full">
+        <label class="field-label" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Show Image URL</span>
+          <span id="img-status-${show.id}" class="img-status" style="font-weight:500;text-transform:none;letter-spacing:0;"></span>
+        </label>
+        <div class="img-fetch-row">
+          <div id="img-thumb-placeholder-${show.id}" class="img-thumb-placeholder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <img id="img-thumb-${show.id}" class="img-thumb" src="" alt="" style="display:none;" onerror="this.style.display='none'; document.getElementById('img-thumb-placeholder-${show.id}').style.display='flex';">
+          <input type="text" id="img-url-${show.id}" value="${escAttr(show.imgUrl)}" placeholder="Auto-filled by Fetch, or paste manually" oninput="handleManualImageInput(${show.id}, this.value)">
+          <button id="fetch-btn-${show.id}" class="btn btn-secondary btn-sm" onclick="fetchOneImage(${show.id})" title="Auto-fetch + smart-crop from event page">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="openImageGallery(${show.id})" title="Browse all images on the page &amp; crop manually">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="openManualCrop(${show.id})" title="Adjust the crop area for the current image">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 002 2h14"/><path d="M18 22V8a2 2 0 00-2-2H2"/></svg>
+          </button>
+        </div>
+        ${presetSelectHTML(show)}
+        <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--gray-600); margin-top:6px;">
+          <input type="checkbox" ${show.whiteBg ? 'checked' : ''} onchange="toggleWhiteBg(${show.id}, this.checked)">
+          Force white background (fixes transparent images turning black)
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--gray-600); margin-top:4px;">
+          <input type="checkbox" id="skip-crop-${show.id}" ${show.skipCrop ? 'checked' : ''} onchange="toggleSkipCrop(${show.id}, this.checked)">
+          Skip auto-crop (use image as-is, original size)
+        </label>
+      </div>
+    </div>`;
+  return card;
+}
+
+// ── Preset images (hard-coded in public/tools/culture-calendar/preset-images.js) ────────────────────
+
+function presetImages() {
+  return Array.isArray(window.PRESET_IMAGES) ? window.PRESET_IMAGES.filter(p => p && p.url) : [];
+}
+
+function presetSelectHTML(show) {
+  const presets = presetImages();
+  const options = presets.length
+    ? presets.map((p, i) => `<option value="${i}" ${p.url === show.rawImgUrl ? 'selected' : ''}>${escText(p.label || p.url)}</option>`).join('')
+    : '<option disabled>None yet — add links in public/tools/culture-calendar/preset-images.js</option>';
+  return `<select id="preset-select-${show.id}" class="preset-select" onchange="applyPresetImage(${show.id}, this.value)">
+          <option value="">Preset image…</option>${options}
+        </select>`;
+}
+
+function applyPresetImage(id, index) {
+  const show = parsedShows.find(s => s.id === id);
+  const preset = presetImages()[index];
+  if (!show || !preset) return;
+  // Presets are hand-picked final links, so use them as-is by default.
+  show.skipCrop = true;
+  const skipBox = document.getElementById('skip-crop-' + id);
+  if (skipBox) skipBox.checked = true;
+  show.rawImgUrl = preset.url;
+  show.cropRect = null;
+  show.imgUrl = preset.url;
+  setImgStatus(id, 'found', '✓ Preset image');
+  updateImgField(id, preset.url);
+  updateThumb(id, preset.url);
+  generateHTML();
+}
+
+// Keeps the dropdown in sync when the image changes some other way
+// (fetch, gallery, manual paste).
+function syncPresetSelect(id) {
+  const select = document.getElementById('preset-select-' + id);
+  const show = parsedShows.find(s => s.id === id);
+  if (!select || !show) return;
+  const idx = presetImages().findIndex(p => p.url === show.rawImgUrl);
+  select.value = idx === -1 ? '' : String(idx);
+}
+
+function updateShow(id, field, val) {
+  const show = parsedShows.find(s => s.id === id);
+  if (show) { show[field] = val; }
+}
+
+// Manually pasted URLs still get the default 622x350 smart crop applied
+// behind the scenes (same as fetched images) — the field just keeps showing
+// exactly what was typed rather than the generated proxy URL.
+function handleManualImageInput(id, raw) {
+  const show = parsedShows.find(s => s.id === id);
+  if (!show) return;
+  raw = raw.trim();
+  show.rawImgUrl = raw;
+  show.cropRect = null;
+  show.imgUrl = !raw ? '' : (show.skipCrop ? raw : buildDisplayImageUrl(raw, null, show.whiteBg));
+  updateThumb(id, show.imgUrl);
+  generateHTML();
+}
+
+function openManualCrop(id) {
+  const show = parsedShows.find(s => s.id === id);
+  if (!show || !show.rawImgUrl) { alert('Add an image URL first.'); return; }
+  galleryState = null;
+  openImageModal();
+  startCrop(show.rawImgUrl, id);
+}
+
+function toggleWhiteBg(id, checked) {
+  const show = parsedShows.find(s => s.id === id);
+  if (!show) return;
+  show.whiteBg = checked;
+  if (show.rawImgUrl && !show.skipCrop) {
+    const finalUrl = buildDisplayImageUrl(show.rawImgUrl, show.cropRect, checked);
+    show.imgUrl = finalUrl;
+    updateImgField(id, finalUrl);
+    updateThumb(id, finalUrl);
+    generateHTML();
+  }
+}
+
+function toggleSkipCrop(id, checked) {
+  const show = parsedShows.find(s => s.id === id);
+  if (!show) return;
+  show.skipCrop = checked;
+  if (!show.rawImgUrl) return;
+  const finalUrl = checked ? show.rawImgUrl : buildDisplayImageUrl(show.rawImgUrl, show.cropRect, show.whiteBg);
+  show.imgUrl = finalUrl;
+  updateImgField(id, finalUrl);
+  updateThumb(id, finalUrl);
+  generateHTML();
+}
+
+function removeShow(id) {
+  parsedShows = parsedShows.filter(s => s.id !== id);
+  if (parsedShows.length === 0) {
+    document.getElementById('shows-container').innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>No shows remaining.</div>';
+    document.getElementById('regen-row').style.display = 'none';
+    document.getElementById('fetch-all-bar').style.display = 'none';
+  } else {
+    renderShowCards();
+    generateHTML();
+  }
+}
+
+function addShowCard() {
+  const blank = { id: ++showCounter, presenter: '', title: '', subtitle: '', dates: '', venue: '', price: '$25', cta: 'Learn More', url: 'https://attpac.org/event/', imgUrl: '', rawImgUrl: '', cropRect: null, whiteBg: false, skipCrop: false, imgAlt: '' };
+  parsedShows.push(blank);
+  const list = document.querySelector('.show-list') || (() => {
+    const l = document.createElement('div'); l.className = 'show-list';
+    document.getElementById('shows-container').appendChild(l); return l;
+  })();
+  const card = makeShowCard(blank);
+  list.appendChild(card);
+  document.getElementById('regen-row').style.display = 'flex';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('fetch-all-bar').style.display = 'flex';
+}
+
+// ── HTML generation ──────────────────────────────────────────────────────────
+
+function generateHTML() {
+  if (!parsedShows.length) return;
+  const html = buildHTML();
+  document.getElementById('html-output').value = html;
+  // Refresh preview if it's visible
+  if (document.getElementById('tab-preview').classList.contains('active')) {
+    document.getElementById('preview-frame').innerHTML = buildPreviewHTML();
+  }
+}
+
+function buildHTML() {
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const missingImages = parsedShows.filter(s => !s.imgUrl).length;
+  const note = missingImages > 0
+    ? `\n     NOTE: ${missingImages} show(s) still need image URLs — search for INSERT_IMAGE_URL_HERE`
+    : '\n     All show images resolved ✓';
+  return `<!-- ============================================================
+     Culture Calendar Show Listings
+     Generated: ${date}${note}
+     Paste between your email header and footer table rows.
+============================================================ -->
+
+${parsedShows.map(showRow).join('\n\n')}`;
+}
+
+function showRow(show) {
+  const url = esc(show.url || '#');
+  const imgSrc = show.imgUrl ? esc(show.imgUrl) : 'INSERT_IMAGE_URL_HERE';
+  const alt = esc((show.imgAlt || show.title || show.presenter) + ' performance');
+  const hasImg = !!show.imgUrl;
+  const subtitleLine = show.subtitle
+    ? `\n            <p style="margin:0 0 6px; font-size:13px; font-weight:bold; color:#000;">${esc(show.subtitle)}</p>`
+    : '';
+  const priceLine = show.price
+    ? `\n            <p style="margin:0 0 12px; font-weight:bold; color:#c60223;">${esc(show.price)}</p>`
+    : '';
+  const venueMargin = show.price ? '2px' : '12px';
+
+  return `<!-- Show: ${esc(show.title || show.presenter)} ${hasImg ? '' : '— ⚠ INSERT_IMAGE_URL_HERE'} -->
+<tr style="background-color: #ffffff;">
+  <td valign="top" style="padding: 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+      <tr>
+        <!-- IMAGE -->
+        <td width="199" valign="top" style="background-color:#ffffff; padding:12px 0 12px 12px;">
+          <a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+            <img src="${imgSrc}"
+                 width="199"
+                 style="display:block; width:199px; max-width:100%; height:auto; border:0;"
+                 alt="${alt}">
+          </a>
+        </td>
+        <!-- TEXT -->
+        <td width="476" valign="top" style="background-color:#ffffff; padding:12px 12px;">
+          <div style="font-family:Arial,sans-serif; line-height:1.2;">
+            <p style="margin:0 0 2px; font-size:12px; color:#666;">
+              ${esc(show.presenter)}
+            </p>
+            <p style="margin:0 0 6px; font-size:18px; font-weight:bold;">
+              ${esc(show.title)}
+            </p>${subtitleLine}
+            <p style="margin:0 0 2px; font-size:12px;">${esc(show.dates)}</p>
+            <p style="margin:0 0 ${venueMargin}; font-size:12px;">${esc(show.venue)}</p>${priceLine}
+            <a href="${url}" target="_blank" rel="noopener noreferrer"
+              style="color:#c60223; text-decoration:underline; font-weight:bold; font-size:14px;">
+              ${esc(show.cta || 'Learn More')}
+            </a>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr><td height="9" style="font-size:9px; line-height:9px;">&nbsp;</td></tr>
+<tr>
+  <td align="center" height="1" style="line-height:1px; font-size:1px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" height="1" width="100%" style="border-collapse:collapse;">
+      <tr><td bgcolor="#000000" height="1" style="line-height:1px; font-size:1px; height:1px; background-color:#000000;">&nbsp;</td></tr>
+    </table>
+  </td>
+</tr>
+<tr><td height="9" style="font-size:9px; line-height:9px;">&nbsp;</td></tr>`;
+}
+
+function buildPreviewHTML() {
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: arial, sans-serif; max-width: 675px; border-collapse: collapse;">
+    ${parsedShows.map(show => `
+    <tr>
+      <td valign="top" style="padding: 0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+          <tr>
+            <td width="199" valign="top" style="background-color:#ffffff; padding:12px 0 12px 12px;">
+              ${show.imgUrl
+                ? `<a href="${escAttr(show.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;"><img src="${escAttr(show.imgUrl)}" width="199" style="display:block;width:199px;max-width:100%;height:auto;border:0;" alt="${escAttr(show.imgAlt)} performance"></a>`
+                : `<div style="width:199px;min-height:112px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:16px;box-sizing:border-box;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    <span style="color:#888;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;">No image yet</span>
+                  </div>`
+              }
+            </td>
+            <td width="476" valign="top" style="background-color:#ffffff; padding:12px 12px; line-height:1.2;">
+              <p style="margin:0 0 2px; font-size:12px; color:#666;">${escText(show.presenter)}</p>
+              <p style="margin:0 0 6px; font-size:18px; font-weight:bold;">${escText(show.title)}</p>
+              ${show.subtitle ? `<p style="margin:0 0 6px; font-size:13px; font-weight:bold; color:#000;">${escText(show.subtitle)}</p>` : ''}
+              <p style="margin:0 0 2px; font-size:12px;">${escText(show.dates)}</p>
+              <p style="margin:0 0 ${show.price ? '2px' : '12px'}; font-size:12px;">${escText(show.venue)}</p>
+              ${show.price ? `<p style="margin:0 0 12px; font-weight:bold; color:#c60223;">${escText(show.price)}</p>` : ''}
+              <a href="${escAttr(show.url || '#')}" target="_blank" rel="noopener noreferrer" style="color:#c60223; text-decoration:underline; font-weight:bold; font-size:14px;">${escText(show.cta || 'Learn More')}</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr><td height="9" style="font-size:9px; line-height:9px;">&nbsp;</td></tr>
+    <tr>
+      <td align="center" height="1" style="line-height:1px; font-size:1px;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" height="1" width="100%" style="border-collapse:collapse;">
+          <tr><td bgcolor="#000000" height="1" style="line-height:1px; font-size:1px; height:1px; background-color:#000000;">&nbsp;</td></tr>
+        </table>
+      </td>
+    </tr>
+    <tr><td height="9" style="font-size:9px; line-height:9px;">&nbsp;</td></tr>`).join('')}
+  </table>`;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function switchTab(tab, el) {
+  // Scoped to the output card so it doesn't also hide the Step 1 input tabs.
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tab-code, #tab-preview').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  if (tab === 'preview') {
+    document.getElementById('preview-frame').innerHTML = parsedShows.length
+      ? buildPreviewHTML()
+      : '<p style="color:#aaa;font-size:13px;text-align:center;padding:40px 0;">Generate HTML first.</p>';
+  }
+}
+
+function copyHTML() {
+  const ta = document.getElementById('html-output');
+  const text = ta.value;
+  if (!text.trim()) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#1a7a3c'; btn.style.color = '#fff'; btn.style.border = 'none';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }, 2200);
+  }).catch(() => {
+    ta.select(); document.execCommand('copy');
+  });
+}
+
+function downloadHTML() {
+  const content = document.getElementById('html-output').value;
+  if (!content.trim()) { alert('Generate HTML first.'); return; }
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'culture-calendar-blocks-' + new Date().toISOString().slice(0,10) + '.html';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function escText(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
