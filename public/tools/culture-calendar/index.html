@@ -1012,43 +1012,27 @@ function buildDisplayImageUrl(rawUrl, crop, whiteBg) {
 
 // ── Image fetching (auto — bulk & single) ──────────────────────────────────
 
+// Each show is fetched on its own, so it fills in as soon as its page has
+// been read — a slow or blocked site no longer holds every other show at
+// "Fetching…" until it gives up. The server still paces requests to any one
+// site.
 async function fetchAllImages() {
   const showsToFetch = parsedShows.filter(s => s.url);
-  const urls = showsToFetch.map(s => s.url);
-  if (!urls.length) return;
+  if (!showsToFetch.length) return;
 
   const btn = document.getElementById('fetch-all-btn');
   btn.disabled = true;
-  btn.textContent = 'Fetching…';
+  let done = 0;
+  const progress = () => { btn.textContent = `Fetching… ${done}/${showsToFetch.length}`; };
+  progress();
 
-  parsedShows.forEach(s => setImgStatus(s.id, 'loading', 'Fetching…'));
-
-  try {
-    const res = await fetch(API_BASE + '/api/fetch-all-images', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls }),
-    });
-    const data = await res.json();
-
-    data.results.forEach(({ imageUrl, error }, i) => {
-      const show = showsToFetch[i];
-      if (!show) return;
-      if (imageUrl) {
-        const finalUrl = show.skipCrop ? imageUrl : buildDisplayImageUrl(imageUrl, null, show.whiteBg);
-        show.imgUrl = finalUrl;
-        show.rawImgUrl = imageUrl;
-        show.cropRect = null;
-        setImgStatus(show.id, 'found', '✓ Image found');
-        updateImgField(show.id, finalUrl);
-        updateThumb(show.id, finalUrl);
-      } else {
-        setImgStatus(show.id, 'missing', error || 'No image found');
-      }
-    });
-
-    generateHTML();
-  } catch (e) {
+  let serverDown = false;
+  await Promise.all(showsToFetch.map(async show => {
+    if (!(await fetchOneImage(show.id))) serverDown = true;
+    done++;
+    progress();
+  }));
+  if (serverDown) {
     setStatus('parse-status', 'Image fetch failed — make sure the server is running at localhost:3000, not opening the file directly.', 'error');
   }
 
@@ -1056,9 +1040,10 @@ async function fetchAllImages() {
   btn.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg> Fetch All Images`;
 }
 
+// Returns false if the server couldn't be reached.
 async function fetchOneImage(id) {
   const show = parsedShows.find(s => s.id === id);
-  if (!show || !show.url) return;
+  if (!show || !show.url) return true;
 
   setImgStatus(id, 'loading', 'Fetching…');
   const btn = document.getElementById('fetch-btn-' + id);
@@ -1085,8 +1070,11 @@ async function fetchOneImage(id) {
     }
   } catch (e) {
     setImgStatus(id, 'missing', 'Server error');
+    if (btn) btn.disabled = false;
+    return false;
   }
   if (btn) btn.disabled = false;
+  return true;
 }
 
 // ── Image gallery + crop modal ───────────────────────────────────────────────

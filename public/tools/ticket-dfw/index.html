@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket DFW — AT&T PAC</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #c60223;
+    --red-dark: #a0011c;
+    --gray-50: #f8f8f8;
+    --gray-100: #f0f0f0;
+    --gray-200: #e0e0e0;
+    --gray-400: #aaaaaa;
+    --gray-600: #666666;
+    --gray-800: #222222;
+    --green: #1a7a3c;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Consolas', 'Courier New', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: var(--font);
+    background: #f4f3f0;
+    color: var(--gray-800);
+    min-height: 100vh;
+    padding: 0 0 24px; /* matches the output card's bottom gap so it never slides under the header */
+  }
+
+  header {
+    background: #1a1a1a;
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--red);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-logo svg { width: 22px; height: 22px; }
+  .header-title { color: #fff; font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { color: #888; font-size: 13px; margin-top: 1px; }
+  .header-home {
+    margin-left: auto;
+    color: #bbb; font-size: 13px; font-weight: 500;
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #444; border-radius: var(--radius);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .header-home:hover { color: #fff; border-color: var(--red); }
+
+  /* Steps 1 + 2 stacked on the left; generated HTML on the right, pinned
+     below the sticky header so it stays in view while the left side scrolls. */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px 24px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .left-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .output-card {
+    position: sticky;
+    top: 104px;
+    height: calc(100vh - 128px);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+  }
+  .output-card .card-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .output-card .tab-panel.active { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #html-output { flex: 1; min-height: 0; resize: none; }
+  #preview-wrap { flex: 1; min-height: 0; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    .output-card { position: static; height: auto; min-height: 0; }
+    #html-output { height: 340px; flex: none; resize: vertical; }
+    #preview-wrap { height: 70vh; flex: none; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 14px 20px; }
+  }
+
+  .card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+  .step-badge {
+    width: 22px; height: 22px;
+    background: var(--red); color: #fff;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-body { padding: 16px 18px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    line-height: 1.55;
+    resize: vertical;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  textarea:focus, input[type="text"]:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(198,2,35,0.1);
+    background: #fff;
+  }
+  textarea.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  label.field-label {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px; font-weight: 600; font-family: var(--font);
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-secondary { background: var(--gray-100); color: var(--gray-800); border: 1px solid var(--gray-200); }
+  .btn-secondary:hover { background: var(--gray-200); }
+  .btn-ghost { background: transparent; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); color: var(--gray-800); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status { font-size: 13px; color: var(--gray-600); margin-top: 8px; min-height: 20px; }
+  .status.error { color: var(--red); }
+  .status.success { color: var(--green); }
+  .section-hint { font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+
+  /* ── Show cards ── */
+  #shows-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+  }
+  .show-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .show-card { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .show-card-head {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .show-num {
+    background: var(--red); color: #fff;
+    border-radius: 10px;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+  }
+  .show-card-head .show-name { color: #ccc; font-size: 12px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head-btn {
+    background: none; border: none; color: #888; cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 5px; border-radius: 3px;
+  }
+  .head-btn:hover:not(:disabled) { color: #fff; background: #333; }
+  .head-btn:disabled { opacity: 0.3; cursor: default; }
+  .show-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--gray-50);
+  }
+  .show-fields .field-full { grid-column: 1 / -1; }
+  .show-fields textarea { min-height: 96px; }
+  @media (max-width: 560px) { .show-fields { grid-template-columns: 1fr; } }
+
+  .img-row { display: flex; gap: 6px; align-items: center; }
+  .img-row input { flex: 1; }
+  .img-thumb {
+    width: 64px; height: 36px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-200);
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gray-400); font-size: 13px;
+  }
+
+  /* ── Output ── */
+  #html-output {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    background: #f6f6fa;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    width: 100%;
+    outline: none;
+    color: #334;
+  }
+  /* The preview renders the blocks at their real 675px email width inside
+     a scaled-down frame, so they fit the panel without reflowing. */
+  #preview-wrap {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    background: #fff;
+  }
+  #preview-frame {
+    position: absolute; top: 0; left: 0;
+    border: none;
+    background: #fff;
+    transform-origin: top left;
+  }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 12px; align-items: flex-end; }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    color: var(--gray-600); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .tab.active { color: var(--red); border-bottom-color: var(--red); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+
+  .sub-label { font-size: 12px; font-weight: 600; color: var(--gray-800); margin: 18px 0 8px; }
+  .sub-label:first-child { margin-top: 0; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/><path d="M13 6v12" stroke-dasharray="2 2"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">Ticket DFW</div>
+    <div class="header-sub">AT&amp;T Performing Arts Center — Internal Tool</div>
+  </div>
+  <a class="header-home" href="../../index.html">&larr; All tools</a>
+</header>
+
+<main>
+
+  <div class="left-col">
+  <!-- Step 1 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <h2>Add the Shows</h2>
+    </div>
+    <div class="card-body">
+      <label class="field-label" for="feature-input">Feature link</label>
+      <input type="text" id="feature-input" placeholder="https://www.ticketdfw.com/event/here-nor-there">
+      <label class="field-label" for="events-input" style="margin-top:12px;">More Upcoming Events — one link per line</label>
+      <textarea id="events-input" rows="4" placeholder="https://www.ticketdfw.com/event/roots-nature&#10;https://www.ticketdfw.com/event/changeling"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="load-btn" onclick="loadLinks()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          Load Shows
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="startBlankFeature()">Fill in feature manually</button>
+        <button class="btn btn-ghost btn-sm" onclick="addBlankEvent()">+ Add event manually</button>
+      </div>
+      <p class="section-hint">The image, presenter, dates, venue and a starting description come from each event page. A new feature link replaces the current feature; event links are added to the list.</p>
+      <p class="status" id="load-status"></p>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <h2>Review &amp; Edit</h2>
+      <button class="btn btn-ghost btn-sm" id="clear-btn" style="margin-left:auto; display:none;" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="card-body">
+      <div id="shows-container">
+        <div class="empty-state">The loaded shows will appear here.</div>
+      </div>
+      <label class="field-label" for="events-heading" style="margin-top:16px;">Events Heading</label>
+      <input type="text" id="events-heading" value="More Upcoming Events" oninput="generateHTML()">
+    </div>
+  </div>
+  </div>
+  <!-- Step 3 -->
+  <div class="card output-card">
+    <div class="card-header">
+      <div class="step-badge">3</div>
+      <h2>Generated HTML</h2>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="copyHTML()" id="copy-btn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy HTML
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHTML()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download .html
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('code', this)">HTML Code</div>
+        <div class="tab" onclick="switchTab('preview', this)">Preview</div>
+      </div>
+      <div id="tab-code" class="tab-panel active">
+        <textarea id="html-output" class="mono" readonly placeholder="HTML will appear here after loading the shows..."></textarea>
+        <p class="section-hint" id="output-hint"></p>
+      </div>
+      <div id="tab-preview" class="tab-panel">
+        <div id="preview-wrap"><iframe id="preview-frame" title="Email preview"></iframe></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="builder.js"></script>
+<script>
+// Image fetching needs the tool's own Node server (npm start, port 3000). If
+// the page was opened some other way — VS Code Live Server, or the file
+// directly — send those requests to port 3000 instead of the current origin.
+const API_BASE = location.protocol.startsWith('http') && location.port === '3000' ? '' : 'http://localhost:3000';
+
+let feature = null; // the big show at the top
+let events = [];    // the "More Upcoming Events" list
+
+function setStatus(msg, type) {
+  const el = document.getElementById('load-status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function newShow(fields) {
+  return {
+    presenter: '', title: '', dates: '', venue: '', blurb: '',
+    cta: DEFAULT_CTA, url: '', rawImgUrl: '', imgAlt: '',
+    ...fields,
+  };
+}
+
+// ── Loading the links ────────────────────────────────────────────────────────
+
+async function fetchShow(url) {
+  const res = await fetch(API_BASE + '/api/event-details', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Could not read that page.');
+  return newShow({
+    url,
+    presenter: data.presenter || '',
+    title: data.title,
+    dates: dateOnly(data.dates),
+    venue: data.venue,
+    blurb: data.description || '',
+    rawImgUrl: data.imageUrl || '',
+    imgAlt: data.title,
+  });
+}
+
+// Two links count as the same show if they differ only in http/https, "www.",
+// letter case, a trailing slash or a ?query.
+function sameShow(url) {
+  return url.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '');
+}
+
+async function loadLinks() {
+  const featureInput = document.getElementById('feature-input');
+  const eventsInput = document.getElementById('events-input');
+  const featureUrl = featureInput.value.trim();
+  // Skip event links that are already on the page — the feature (the one
+  // being loaded, or the current one) or an event already in the list — so
+  // loading the same links twice doesn't list each event twice.
+  const loaded = new Set([featureUrl || (feature && feature.url), ...events.map(e => e.url)].filter(Boolean).map(sameShow));
+  let skipped = 0;
+  const eventUrls = eventsInput.value.split(/\s+/).filter(Boolean).filter(u => {
+    if (loaded.has(sameShow(u))) { skipped++; return false; }
+    loaded.add(sameShow(u));
+    return true;
+  });
+  const all = (featureUrl ? [featureUrl] : []).concat(eventUrls);
+  if (!all.length) {
+    eventsInput.value = '';
+    setStatus(skipped ? 'Those shows are already loaded.' : 'Paste a feature link, event links, or both.', skipped ? '' : 'error');
+    return;
+  }
+  const bad = all.find(u => !/^https?:\/\//i.test(u));
+  if (bad) { setStatus(`Not a link: ${bad}`, 'error'); return; }
+
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+  setStatus(`Loading ${all.length} show${all.length === 1 ? '' : 's'}…`);
+  const results = await Promise.allSettled(all.map(fetchShow));
+  btn.disabled = false;
+
+  const failed = [];
+  results.forEach((r, i) => {
+    const isFeature = featureUrl && i === 0;
+    if (r.status === 'rejected') { failed.push({ url: all[i], err: r.reason }); return; }
+    if (isFeature) feature = r.value; else events.push(r.value);
+  });
+  // Keep only the links that failed in the boxes so they can be fixed and retried.
+  featureInput.value = failed.some(f => f.url === featureUrl) ? featureUrl : '';
+  eventsInput.value = failed.filter(f => f.url !== featureUrl || !featureUrl).map(f => f.url).join('\n');
+  renderShows();
+  generateHTML();
+
+  if (!failed.length) {
+    setStatus('✓ Loaded. Check the venue and trim the descriptions if needed.' + (skipped ? ` Skipped ${skipped} link${skipped === 1 ? '' : 's'} already loaded.` : ''), 'success');
+  } else if (failed.every(f => f.err instanceof TypeError)) {
+    setStatus('Could not reach the tool server — make sure it is running (npm start).', 'error');
+  } else {
+    setStatus(`${failed.length} link${failed.length === 1 ? '' : 's'} failed and ${failed.length === 1 ? 'was' : 'were'} left in the box: ${failed[0].err.message}`, 'error');
+  }
+}
+
+function startBlankFeature() {
+  feature = newShow({});
+  renderShows();
+  generateHTML();
+  setStatus('');
+}
+
+function addBlankEvent() {
+  events.push(newShow({}));
+  renderShows();
+  generateHTML();
+  setStatus('');
+}
+
+function clearAll() {
+  feature = null;
+  events = [];
+  renderShows();
+  generateHTML();
+  setStatus('');
+}
+
+// ── Show cards ───────────────────────────────────────────────────────────────
+// The feature is addressed as 'f', events by their index in the list.
+
+function showFor(ref) { return ref === 'f' ? feature : events[ref]; }
+
+function renderShows() {
+  const container = document.getElementById('shows-container');
+  document.getElementById('clear-btn').style.display = feature || events.length ? '' : 'none';
+  if (!feature && !events.length) {
+    container.innerHTML = '<div class="empty-state">The loaded shows will appear here.</div>';
+    return;
+  }
+  let html = '';
+  if (feature) html += `<p class="sub-label">Feature</p><div class="show-list">${featureCard()}</div>`;
+  if (events.length) html += `<p class="sub-label">More Upcoming Events</p><div class="show-list">${events.map(eventCard).join('')}</div>`;
+  container.innerHTML = html;
+}
+
+function field(ref, key, label, opts = {}) {
+  const s = showFor(ref);
+  const r = ref === 'f' ? "'f'" : ref;
+  const input = opts.textarea
+    ? `<textarea rows="5" placeholder="${escAttr(opts.placeholder || '')}" oninput="updateShow(${r}, '${key}', this.value)">${escHtml(s[key])}</textarea>`
+    : `<input type="text" value="${escAttr(s[key])}" placeholder="${escAttr(opts.placeholder || '')}" oninput="updateShow(${r}, '${key}', this.value)">`;
+  return `<div class="${opts.full ? 'field-full' : ''}">
+        <label class="field-label">${label}</label>
+        ${input}
+      </div>`;
+}
+
+function imageField(ref, width) {
+  const s = showFor(ref);
+  const r = ref === 'f' ? "'f'" : ref;
+  const src = buildImageUrl(s.rawImgUrl, width);
+  return `<div class="field-full">
+        <label class="field-label">Image URL</label>
+        <div class="img-row">
+          <img class="img-thumb" id="img-thumb-${ref}" alt="" ${src ? `src="${escAttr(src)}"` : ''}>
+          <input type="text" value="${escAttr(s.rawImgUrl)}" placeholder="Filled from the event page, or paste an image URL" oninput="updateImage(${r}, this.value, ${width})">
+        </div>
+      </div>`;
+}
+
+function featureCard() {
+  return `<div class="show-card">
+    <div class="show-card-head">
+      <span class="show-num">Feature</span>
+      <span class="show-name" id="show-name-f">${escHtml(feature.title || 'Untitled')}</span>
+      <button class="head-btn" title="Remove" onclick="removeShow('f')">✕</button>
+    </div>
+    <div class="show-fields">
+      ${imageField('f', 675)}
+      ${field('f', 'title', 'Title (30px bold)', { full: true })}
+      ${field('f', 'dates', 'Dates')}
+      ${field('f', 'venue', 'Venue')}
+      ${field('f', 'blurb', 'Description — put *asterisks* around words for italics', { full: true, textarea: true })}
+      ${field('f', 'cta', 'Button Text')}
+      ${field('f', 'imgAlt', 'Image Alt Text')}
+      ${field('f', 'url', 'Link URL (image + button)', { full: true })}
+    </div>
+  </div>`;
+}
+
+function eventCard(s, i) {
+  return `<div class="show-card">
+    <div class="show-card-head">
+      <span class="show-num">${i + 1}</span>
+      <span class="show-name" id="show-name-${i}">${escHtml(s.title || 'Untitled')}</span>
+      <button class="head-btn" title="Move up" onclick="moveEvent(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button class="head-btn" title="Move down" onclick="moveEvent(${i}, 1)" ${i === events.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="head-btn" title="Remove" onclick="removeShow(${i})">✕</button>
+    </div>
+    <div class="show-fields">
+      ${imageField(i, 200)}
+      ${field(i, 'presenter', 'Presenter (small line above title)', { full: true, placeholder: 'e.g. Ballet North Texas Presents' })}
+      ${field(i, 'title', 'Title (18px bold)', { full: true })}
+      ${field(i, 'venue', 'Venue')}
+      ${field(i, 'dates', 'Dates')}
+      ${field(i, 'cta', 'Link Text')}
+      ${field(i, 'imgAlt', 'Image Alt Text')}
+      ${field(i, 'url', 'Link URL (image + link)', { full: true })}
+    </div>
+  </div>`;
+}
+
+function updateShow(ref, key, value) {
+  const s = showFor(ref);
+  if (!s) return;
+  s[key] = value;
+  if (key === 'title') document.getElementById('show-name-' + ref).textContent = value || 'Untitled';
+  generateHTML();
+}
+
+function updateImage(ref, raw, width) {
+  const s = showFor(ref);
+  if (!s) return;
+  s.rawImgUrl = raw.trim();
+  const src = buildImageUrl(s.rawImgUrl, width);
+  const thumb = document.getElementById('img-thumb-' + ref);
+  if (src) thumb.src = src; else thumb.removeAttribute('src');
+  generateHTML();
+}
+
+function moveEvent(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= events.length) return;
+  [events[i], events[j]] = [events[j], events[i]];
+  renderShows();
+  generateHTML();
+}
+
+function removeShow(ref) {
+  if (ref === 'f') feature = null; else events.splice(ref, 1);
+  renderShows();
+  generateHTML();
+}
+
+function eventsHeading() { return document.getElementById('events-heading').value.trim(); }
+
+function hasContent() { return !!(feature || events.length); }
+
+function generateHTML() {
+  const out = document.getElementById('html-output');
+  const hint = document.getElementById('output-hint');
+  if (!hasContent()) {
+    out.value = '';
+    hint.textContent = '';
+    refreshPreview();
+    return;
+  }
+  const name = feature ? (feature.title || 'Untitled') : 'More Upcoming Events';
+  out.value = `<!-- Ticket DFW: ${escComment(name)} — paste as the email body, under the header. -->\n` + buildTicketDfwBody(feature, events, eventsHeading());
+  const missing = [feature, ...events].filter(s => s && !s.rawImgUrl).length;
+  hint.textContent = 'Paste this as the email body, under the header.' + (missing ? ` ⚠ ${missing} show${missing === 1 ? ' has' : 's have'} no image yet — search for INSERT_IMAGE_URL_HERE.` : '');
+  refreshPreview();
+}
+
+// Preview renders the body in an iframe so its styles can't leak into this
+// page.
+const PREVIEW_WIDTH = 700; // a little wider than the 675px email
+const PLACEHOLDER_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="675" height="380"><rect width="675" height="380" fill="#e4e6e7"/><text x="337.5" y="195" font-family="Arial" font-size="13" fill="#8a8f92" text-anchor="middle">No image yet</text></svg>');
+
+function fitPreview() {
+  const wrapEl = document.getElementById('preview-wrap');
+  const frame = document.getElementById('preview-frame');
+  const scale = Math.min(1, wrapEl.clientWidth / PREVIEW_WIDTH) || 1;
+  frame.style.width = PREVIEW_WIDTH + 'px';
+  frame.style.height = (wrapEl.clientHeight / scale) + 'px';
+  frame.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitPreview);
+
+function refreshPreview() {
+  if (!document.getElementById('tab-preview').classList.contains('active')) return;
+  fitPreview();
+  const frame = document.getElementById('preview-frame');
+  if (!hasContent()) {
+    frame.srcdoc = '<p style="font-family:sans-serif;color:#aaa;font-size:13px;text-align:center;padding:40px 0;">Load a show to see a preview.</p>';
+    return;
+  }
+  // Preview only: show a grey "No image yet" box instead of a broken image.
+  const body = buildTicketDfwBody(feature, events, eventsHeading()).replaceAll('src="INSERT_IMAGE_URL_HERE"', `src="${PLACEHOLDER_IMG}"`);
+  frame.srcdoc = `<body style="margin:0;font-family:arial;">${body}<\/body>`; // "<\/" so Live Server doesn't inject its reload script here
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function switchTab(tab, el) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#tab-code, #tab-preview').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  refreshPreview();
+}
+
+function copyHTML() {
+  const ta = document.getElementById('html-output');
+  const text = ta.value;
+  if (!text.trim()) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#1a7a3c'; btn.style.color = '#fff'; btn.style.border = 'none';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }, 2200);
+  }).catch(() => {
+    ta.select(); document.execCommand('copy');
+  });
+}
+
+function downloadHTML() {
+  const content = document.getElementById('html-output').value;
+  if (!content.trim()) { setStatus('Load a show first.', 'error'); return; }
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ticket-dfw-${new Date().toISOString().slice(0, 10)}.html`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function escComment(s) { return (s || '').replace(/--/g, '—'); }
+</script>
+</body>
+</html>

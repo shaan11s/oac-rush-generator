@@ -10,6 +10,8 @@ every tool; pick one to open it. Each tool lives in its own folder:
    public/tools/square-blocks/        Square Blocks
    public/tools/main-feature/         Main Feature
    public/tools/main-features/        2 Main Features
+   public/tools/ticket-dfw/           Ticket DFW
+   gmail-auto-reply/                  Ticket DFW Gmail auto-reply (Apps Script)
    public/vendor/                     shared libraries
 
 To add a tool: create public/tools/<name>/index.html and add a card for it
@@ -101,6 +103,19 @@ and generate copy-ready HTML blocks for ActiveCampaign.
   resized to 622×350 via images.weserv.nl (wsrv.nl), a free public image
   proxy — the final image URL in the HTML points there, not at your
   computer, so no image hosting/storage is needed on your end.
+- Pages are fetched politely: at most two at a time from the same site, and
+  if a site answers "429 Too Many Requests" the tool waits as long as the
+  site asks (up to 20 seconds) and tries again, up to 3 times.
+- Some sites (dma.org, for example) build their pages with JavaScript, so
+  the page the server downloads is empty. When that happens the server opens
+  the page in a hidden Chrome window, like a browser would, and reads the
+  finished page — using the event info the page publishes for Google and
+  social media if it has any, otherwise the largest text as the title, the
+  text under it as the description, and the biggest picture as the image.
+  This needs Google Chrome (or Microsoft Edge) installed; set CHROME_PATH if
+  it's somewhere unusual. After updating the tool, run "npm install" once.
+- dma.org pages are read straight from the DMA's own content files, which is
+  faster and also gets the exact dates.
 - If an image can't be auto-fetched, the HTML still outputs with
   INSERT_IMAGE_URL_HERE as a placeholder you can swap manually.
 
@@ -162,3 +177,53 @@ The single big feature right under the email header: a full-width image, a
 3. Copy or download the HTML and paste the rows into the email's main 675px
    table, under the header.
 
+---
+
+## Ticket DFW
+
+The Ticket DFW email body: one featured show (full-width image, title,
+"Dates | Venue", short description and an orange Get Tickets button), then
+"More Upcoming Events" — each with a small image, presenter, title, venue,
+dates and a Get Tickets link, with a black line between them.
+
+1. Paste the featured show's ticketdfw.com link in the first box and the
+   other events' links (one per line) in the second, then click "Load Shows".
+   The description is the event page's short description (the line under
+   the title). Some pages list no venue — fill it in by hand.
+2. Edit anything, reorder or remove events, or change the heading.
+3. Copy or download the HTML and paste it as the email body.
+
+The HTML is built by public/tools/ticket-dfw/builder.js, which the Gmail
+auto-reply below also uses.
+
+---
+
+## Ticket DFW — Gmail auto-reply
+
+A Google Apps Script that watches Gmail and does the Ticket DFW tool's job
+by itself. When an email from shaan.sekhon@attpac.org with "TICKET DFW" or "TDFW" in
+the subject arrives, it takes the ticketdfw.com links in it (the first one
+is the featured show, the rest are "More Upcoming Events"), builds the HTML
+and emails it back with the subject "Ticket DFW HTML": the .html file is
+attached and a preview is in the message, plus a list of anything missing
+(e.g. a venue). It runs on Google's servers, so this computer doesn't need
+to be on. The sender, subject text and timing are at the top of Code.gs.
+
+Setup (once), signed in to the Gmail account the emails are forwarded to:
+1. Go to https://script.google.com and click "New project". Name it
+   "Ticket DFW auto-reply".
+2. Replace everything in Code.gs with gmail-auto-reply/Code.gs.
+3. Click + next to Files > Script, name it "Builder", and replace its
+   contents with public/tools/ticket-dfw/builder.js.
+4. Click the save icon. In the function menu at the top choose "setup",
+   then click Run. Allow the permissions it asks for (Gmail, and fetching
+   the event pages). Google may warn that the app isn't verified — click
+   Advanced > Go to Ticket DFW auto-reply; it's your own script.
+5. Done. It checks every 5 minutes. Emails that were already in the inbox
+   are skipped; forward a new one to test it.
+
+- To stop it, choose "stop" in the function menu and click Run.
+- After changing builder.js, paste it into Builder again so the emails
+  match the web tool.
+- If something goes wrong, the reply's subject is "Ticket DFW HTML —
+  failed" with the error. Runs are listed under Executions (left sidebar).

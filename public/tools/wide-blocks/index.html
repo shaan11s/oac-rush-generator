@@ -451,7 +451,8 @@ function stripYear(dates) {
   return (dates || '').replace(/,?\s*\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// Crops the show photo to 16:9 at 2× the 318px display width so it stays sharp.
+// Crops the show photo to 16:9 at 1200px wide so it stays sharp both at 318px
+// on desktop and full-width on a phone.
 // attpac.org photos are cropped by imgix directly; anything else goes through
 // the wsrv.nl image proxy (same approach as the Culture Calendar tool).
 function buildImageUrl(rawUrl) {
@@ -462,14 +463,14 @@ function buildImageUrl(rawUrl) {
       u.search = '';
       u.searchParams.set('fit', 'crop');
       u.searchParams.set('crop', 'faces,entropy,center');
-      u.searchParams.set('w', '636');
-      u.searchParams.set('h', '358');
+      u.searchParams.set('w', '1200');
+      u.searchParams.set('h', '675');
       u.searchParams.set('q', '75');
       u.searchParams.set('fm', 'jpg');
       return u.toString();
     }
   } catch (e) { return rawUrl; }
-  const params = new URLSearchParams({ url: rawUrl.replace(/^https?:\/\//, ''), w: '636', h: '358', fit: 'cover', a: 'attention', output: 'jpg', q: '75' });
+  const params = new URLSearchParams({ url: rawUrl.replace(/^https?:\/\//, ''), w: '1200', h: '675', fit: 'cover', a: 'attention', output: 'jpg', q: '75' });
   return `https://wsrv.nl/?${params}`;
 }
 
@@ -580,6 +581,12 @@ function removeShow(id) {
 // Each show block copies the structure of the finished example email: grey
 // (#bfc4c6) two-column row, 318px image on the left, 18px Arial text on the
 // right, blocks separated by 30px spacers. Row ids are unique per block.
+// The image and text sit side by side on desktop and stack on a phone —
+// image on top, filling the width at its 16:9 shape, text underneath. See
+// stackingColumn for how each mail app gets there. Both columns are
+// vertically centred inside one grey <div>, which grows to the taller column
+// — so the two sides are always the same height, even in mail apps that drop
+// the row cell's background.
 
 const blockId = i => 700000 + (i + 1) * 10;
 
@@ -588,6 +595,39 @@ const TEXT_SPAN = 'color: #000000; font-size: 18px; font-weight: inherit; line-h
 const TABLE_STYLE = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: collapse; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
 const TABLE_STYLE_INITIAL = '-ms-text-size-adjust: auto; -webkit-text-size-adjust: 100%; border-collapse: initial !important; font-size: 14px; min-width: 100%; mso-table-lspace: 0pt; mso-table-rspace: 0pt;';
 const TW_RESET = '--tw-shadow: 0 0 transparent; --tw-ring-inset: var(--tw-empty, ); --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff; --tw-ring-color: rgba(59,130,246,0.5); --tw-ring-offset-shadow: 0 0 transparent; --tw-ring-shadow: 0 0 transparent;';
+
+// Two columns that sit side by side on desktop and stack, each full width, on
+// a phone. Every mail app needs a different route to that:
+// - Gmail ignores <style> in the email body, so the column's own style does
+//   it (the "Fab Four" technique): calc() is hugely negative in a container
+//   wider than STACK_BELOW, so min-width (the desktop width) wins, and hugely
+//   positive in a narrower one, so max-width (100%) wins. No nested brackets
+//   in the calc — Gmail drops those.
+// - Outlook (every version) has no calc(), but outside Windows it reads the
+//   <style> in MOBILE_STYLE, which sets the same widths with !important.
+// - Outlook for Windows uses neither; it gets a plain table inside
+//   <!--[if mso]> comments.
+// The parent cell has font-size: 0 and there's no space between the two
+// <div>s, so nothing but the columns takes up room on the line; the widths
+// also add up to a bit under 100% as a safety margin.
+// Same approach as stackingColumn in tools/ticket-dfw/builder.js.
+const STACK_BELOW = 600;
+const IMG_COL_WIDTH = '50%';    // 338px of 675
+const TEXT_COL_WIDTH = '49.2%';
+function stackingColumn(width) {
+  return `display: inline-block; vertical-align: middle; width: ${width}; min-width: ${width}; max-width: 100%; width: calc(${STACK_BELOW * STACK_BELOW}px - ${STACK_BELOW}00%);`;
+}
+
+// Read by every mail app except Gmail (which gets the layout from
+// stackingColumn instead). On phones it also caps every table and image in the email
+// — the template's header too — at the screen width: one fixed-width one is
+// enough to make iPhone Mail zoom the whole email out, leaving the blocks a
+// strip of it. data-ac-keep stops ActiveCampaign removing it.
+const MOBILE_STYLE = `<style data-ac-keep="true">
+.wb-col-img { width: ${IMG_COL_WIDTH} !important; }
+.wb-col-text { width: ${TEXT_COL_WIDTH} !important; }
+@media only screen and (max-width: ${STACK_BELOW}px) { table, td, img { max-width: 100% !important; } img { height: auto !important; } .wb-col-img, .wb-col-text { width: 100% !important; } }
+</style>`;
 
 function textLine(text, bold) {
   const span = `<span style="${TEXT_SPAN}" class="">${escHtml(text)}</span>`;
@@ -610,11 +650,12 @@ function showBlock(show, i) {
 
   return `<!-- Show ${i + 1}: ${escComment(show.title || show.presenter || 'Untitled')} -->
 <tr id="layout-row${id}" class="layout layout-row clear-this " style="mso-line-height-rule: exactly; background-color: #ffffff;">
-<td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; background-color: #ffffff;">
-<table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
-<tr style="mso-line-height-rule: exactly;">
-<td id="layout_table_wb${id}_img" valign="top" width="338" style="mso-line-height-rule: exactly; background-color: #bfc4c6;">
-<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="338" style="${TABLE_STYLE} background-color: #bfc4c6;">
+<td id="layout-row-padding${id}" valign="top" bgcolor="#bfc4c6" style="mso-line-height-rule: exactly; background-color: #bfc4c6; font-size: 0; text-align: left;">
+${MOBILE_STYLE}
+<div style="background-color: #bfc4c6; font-size: 0; text-align: left;">
+<!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" width="338" bgcolor="#bfc4c6"><![endif]-->
+<div id="layout_table_wb${id}_img" class="wb-col-img" style="${stackingColumn(IMG_COL_WIDTH)}">
+<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="100%" style="${TABLE_STYLE} background-color: #bfc4c6;">
 <tr style="mso-line-height-rule: exactly; background-color: #bfc4c6;">
 <td id="layout-row-margin${id + 2}" valign="top" style="mso-line-height-rule: exactly; padding: 0; background-color: #bfc4c6;">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
@@ -622,15 +663,15 @@ function showBlock(show, i) {
 <td id="layout-row-padding${id + 2}" valign="top" style="mso-line-height-rule: exactly; background-color: #bfc4c6; padding: 10px;">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
 <tr style="mso-line-height-rule: exactly;">
-<td class="image-td" align="left" valign="top" width="318" style="mso-line-height-rule: exactly;"><a href="${url}" style="margin: 0; outline: none; padding: 0; color: #c60223; display: block; min-width: 100%;"><img src="${escAttr(show.imgUrl || 'INSERT_IMAGE_URL_HERE')}" alt="${escAttr(show.imgAlt || show.title)}" width="318" style="border: none; display: block; outline: none; width: 318px; opacity: 1; max-width: 100%;"></a></td>
+<td class="image-td" align="center" valign="top" width="318" style="mso-line-height-rule: exactly;"><a href="${url}" style="margin: 0; outline: none; padding: 0; color: #c60223; display: block; min-width: 100%;"><img src="${escAttr(show.imgUrl || 'INSERT_IMAGE_URL_HERE')}" alt="${escAttr(show.imgAlt || show.title)}" width="318" style="border: none; display: block; outline: none; width: 100%; height: auto; opacity: 1;"></a></td>
 </tr>
 </table></td>
 </tr>
 </table></td>
 </tr>
-</table></td>
-<td id="layout_table_wb${id}_text" valign="top" width="337" style="mso-line-height-rule: exactly; background-color: #bfc4c6;">
-<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="337" style="${TABLE_STYLE} background-color: #bfc4c6;">
+</table>
+</div><!--[if mso]></td><td valign="middle" width="337" bgcolor="#bfc4c6"><![endif]--><div id="layout_table_wb${id}_text" class="wb-col-text" style="${stackingColumn(TEXT_COL_WIDTH)}">
+<table cellpadding="0" cellspacing="0" border="0" class="layout layout-table " width="100%" style="${TABLE_STYLE} background-color: #bfc4c6;">
 <tr style="mso-line-height-rule: exactly; background-color: #bfc4c6;">
 <td id="layout-row-margin${id + 3}" valign="top" style="mso-line-height-rule: exactly; padding: 0px 10px 0px 10px; background-color: #bfc4c6;">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE_INITIAL}">
@@ -652,9 +693,10 @@ ${lines}
 </tr>
 </table></td>
 </tr>
-</table></td>
-</tr>
-</table></td>
+</table>
+</div><!--[if mso]></td></tr></table><![endif]-->
+</div>
+</td>
 </tr>`;
 }
 
