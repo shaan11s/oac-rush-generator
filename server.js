@@ -454,9 +454,6 @@ async function renderPage(url) {
   return result;
 }
 
-// The page's HTML, rendered in Chrome if the plain HTML is an empty shell or
-// the site turned the plain request away (403/429). Falls back to whatever
-// the plain request got.
 // { html, info }: the page's HTML, rendered in Chrome if the plain HTML is
 // an empty shell or the site turned the plain request away (403/429/503) —
 // then info holds what readRenderedPage found. Falls back to whatever the
