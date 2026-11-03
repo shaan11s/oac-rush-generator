@@ -4,6 +4,16 @@ const path = require('path');
 const dns = require('dns').promises;
 const net = require('net');
 
+// Private settings (API keys) live in a ".env" file next to this one, as
+// NAME=value lines — see .env.example. It's listed in .gitignore so keys are
+// never uploaded. Values already set in the environment win.
+try {
+  require('fs').readFileSync(path.join(__dirname, '.env'), 'utf8').split(/\r?\n/).forEach(line => {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  });
+} catch (e) { /* no .env file — fine */ }
+
 const app = express();
 const PORT = 3000;
 
@@ -264,14 +274,14 @@ function hostUnreachable(url) {
 
 const pageCache = new Map(); // url + accept -> { time, text }
 
-async function fetchText(url, accept = FETCH_HEADERS.Accept) {
+async function fetchText(url, accept = FETCH_HEADERS.Accept, extraHeaders = {}) {
   const key = accept + ' ' + url;
   const hit = pageCache.get(key);
   if (hit && Date.now() - hit.time < CACHE_MS) return hit.text;
   const text = await withHostLimit(url, async () => {
     if (hostChallenged(url)) throw new HttpError(429, true); // found a wall while waiting
     for (let attempt = 0; ; attempt++) {
-      const response = await safeFetch(url, { headers: { ...FETCH_HEADERS, Accept: accept }, timeout: 8000 });
+      const response = await safeFetch(url, { headers: { ...FETCH_HEADERS, Accept: accept, ...extraHeaders }, timeout: 8000 });
       if (!response.ok && isChallenge(response)) {
         hostState(url).challengedAt = Date.now();
         throw new HttpError(response.status, true);
@@ -635,8 +645,97 @@ function dmaDescription(data) {
   return '';
 }
 
+// ── culturalyst.com events ───────────────────────────────────────────────────
+// Culturalyst's event pages load their data from
+// www.culturalyst.com/api/events/<id> — presenter, title, times, venue
+// address, photo. That address needs no key, but the whole site sits behind
+// Vercel's bot checkpoint, which turns away anything that isn't a browser.
+// So the data is first asked for directly (with CULTURALYST_API_KEY from .env
+// attached, in case Culturalyst ever lets keyed requests through), and when
+// the checkpoint refuses, hidden Chrome opens the event page — passing the
+// checkpoint like any browser — and asks for the data from inside it.
+
+const CULTURALYST_MISSING = 'That event isn\'t on Culturalyst — check the link (it may have been removed or not be public yet).';
+
+function culturalystEventId(pageUrl) {
+  let u;
+  try { u = new URL(pageUrl); } catch (e) { return null; }
+  if (!/(^|\.)culturalyst\.com$/i.test(u.hostname)) return null;
+  const m = u.pathname.match(/^\/events\/(\d+)\b/);
+  return m ? m[1] : null;
+}
+
+async function fetchCulturalystEvent(pageUrl) {
+  const id = culturalystEventId(pageUrl);
+  const apiUrl = `https://www.culturalyst.com/api/events/${id}`;
+  const key = process.env.CULTURALYST_API_KEY;
+  const headers = key ? { 'X-Api-Key': key } : {};
+
+  try {
+    return JSON.parse(await fetchText(apiUrl, 'application/json', headers));
+  } catch (e) {
+    if (!e.challenge && e.status !== 429) throw [403, 404].includes(e.status) ? new Error(CULTURALYST_MISSING) : e;
+  }
+
+  const browser = await getBrowser();
+  if (!browser) throw new Error('Culturalyst blocks automated requests, and reading it needs Google Chrome installed.');
+  const data = await withHostLimit(apiUrl, () => withTimeout(RENDER_TIMEOUT_MS, async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setUserAgent(FETCH_HEADERS['User-Agent']);
+      await page.goto(`https://www.culturalyst.com/events/${id}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await page.waitForFunction(re => !new RegExp(re, 'i').test(document.title), { timeout: 15000 }, CHALLENGE_TITLES).catch(() => {});
+      const res = await page.evaluate(async (path, headers) => {
+        const r = await fetch(path, { headers: { Accept: 'application/json', ...headers } });
+        return { status: r.status, text: await r.text() };
+      }, `/api/events/${id}`, headers);
+      // A missing (or unpublished) event comes back as 403 "Unauthorized".
+      if (res.status === 403 || res.status === 404) throw new Error(CULTURALYST_MISSING);
+      if (res.status !== 200) throw new HttpError(res.status, res.status === 429);
+      return JSON.parse(res.text);
+    } finally {
+      page.close().catch(() => {});
+      releaseBrowserSoon();
+    }
+  }));
+  if (!data) throw new HttpError(429, true);
+  return data;
+}
+
+// The calendar date (in the event's own time zone) of an ISO time.
+function localDay(iso, timeZone) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: timeZone || 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+  } catch (e) { return String(iso).slice(0, 10); }
+}
+
+function culturalystImages(ev) {
+  const urls = [ev.image_url];
+  (ev.attachments || []).forEach(a => { if (a.classification === 'image' || /^image\//.test(a.content_type || '')) urls.push(a.url || a.display_url); });
+  if (ev.creator_profile) urls.push(ev.creator_profile.cover_photo_url);
+  return [...new Set(urls.filter(Boolean))];
+}
+
+function culturalystDetails(ev) {
+  // "Oak Cliff Cultural Center, 223 Jefferson Blvd" -> the place name. A bare
+  // street address falls back to the organisation hosting the event.
+  const line = ((ev.address && ev.address.address_line) || '').trim();
+  const place = line.split(',')[0].trim();
+  const venue = place && !/^\d/.test(place) ? place : ((ev.creator_profile && ev.creator_profile.title) || line);
+  const firstParagraph = ((ev.description || '').match(/<p[^>]*>([\s\S]*?)<\/p>/i) || [, ev.description || ''])[1];
+  return {
+    presenter: htmlToText(String(ev.pre_title || '')),
+    title: htmlToText(String(ev.title || '')),
+    dates: formatDays([ev.start_time, ev.end_time].filter(Boolean).map(t => localDay(t, ev.timezone))),
+    venue,
+    description: htmlToText(firstParagraph),
+    imageUrl: culturalystImages(ev)[0] || null,
+  };
+}
+
 async function fetchEventImage(url) {
   if (dmaContentUrl(url)) return dmaImages(await fetchDmaPage(url))[0] || null;
+  if (culturalystEventId(url)) return culturalystImages(await fetchCulturalystEvent(url))[0] || null;
   const { html, info } = await fetchUsableHtml(url);
   const primary = extractCarouselImage(html, url) || structuredDetails(html, url).imageUrl || (info && info.imageUrl);
   if (primary) return primary;
@@ -720,6 +819,8 @@ app.post('/api/fetch-page-images', async (req, res) => {
     let images;
     if (dmaContentUrl(url)) {
       images = dmaImages(await fetchDmaPage(url));
+    } else if (culturalystEventId(url)) {
+      images = culturalystImages(await fetchCulturalystEvent(url));
     } else {
       const { html, info } = await fetchUsableHtml(url);
       const primary = extractCarouselImage(html, url) || structuredDetails(html, url).imageUrl || (info && info.imageUrl);
@@ -741,8 +842,9 @@ app.post('/api/fetch-page-images', async (req, res) => {
 // Reads the show info from the heading of an attpac.org event page (used by
 // the Wide Blocks, Square Blocks and feature tools). Every attpac.org event page marks these fields with the
 // same eventHeading__* classes. ticketdfw.com pages share them; dma.org is
-// read from its content JSON; any other site falls back to the event info it
-// publishes for Google and social media (structuredDetails).
+// read from its content JSON and culturalyst.com from its events API; any
+// other site falls back to the event info it publishes for Google and social
+// media (structuredDetails).
 
 const NAMED_ENTITIES = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
@@ -780,6 +882,7 @@ app.post('/api/event-details', async (req, res) => {
         imageUrl: dmaImages(data)[0] || null,
       });
     }
+    if (culturalystEventId(url)) return res.json(culturalystDetails(await fetchCulturalystEvent(url)));
     const { html, info } = await fetchUsableHtml(url);
     const presenter = eventHeadingField(html, 'eventHeading__preheading');
     let title = eventHeadingField(html, 'eventHeading__title');

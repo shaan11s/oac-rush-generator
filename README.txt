@@ -116,6 +116,16 @@ and generate copy-ready HTML blocks for ActiveCampaign.
   it's somewhere unusual. After updating the tool, run "npm install" once.
 - dma.org pages are read straight from the DMA's own content files, which is
   faster and also gets the exact dates.
+- culturalyst.com event links are read from Culturalyst's own event data
+  (presenter, title, dates, venue, description, photo). Culturalyst's bot
+  protection turns away plain requests, so this goes through the hidden
+  Chrome window too, and needs Chrome installed. A link to an event that
+  isn't public says so instead of picking up a wrong image.
+- API keys go in a file called ".env" next to server.js (copy .env.example
+  and fill it in). That file is never uploaded to GitHub. Restart the server
+  after changing it. Culturalyst's key goes on the CULTURALYST_API_KEY line;
+  event data currently loads without it, but it's sent along in case
+  Culturalyst later lets keyed requests skip its bot protection.
 - If an image can't be auto-fetched, the HTML still outputs with
   INSERT_IMAGE_URL_HERE as a placeholder you can swap manually.
 
