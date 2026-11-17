@@ -19,20 +19,26 @@ function dateOnly(dates) {
   return dates.replace(/,?\s*(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)(?=\W|$).*$/i, '').trim();
 }
 
-// Crops the photo to 16:9 (the shape of every image in the example email) at
-// 2× its display width so it stays sharp: 675px for the feature, and 600px
-// for the event photos — they're 200px on desktop but full width on phones. attpac-media imgix photos are cropped by imgix
-// directly; anything else goes through the wsrv.nl image proxy.
-function buildImageUrl(rawUrl, displayWidth) {
+// ── Photo sizes ── the files photos are loaded at. Higher numbers = sharper
+// but heavier emails; quality is JPEG quality, 1-100. Heights follow from the
+// 16:9 crop (the shape of every image in the example email).
+const FEATURE_PHOTO_WIDTH = 1000; // shown 675px wide on desktop, full width on phones
+const EVENT_PHOTO_WIDTH = 900;    // shown 200px on desktop, full width on phones
+const PHOTO_QUALITY = 70;
+
+// Crops the photo to 16:9 at fileWidth pixels wide. attpac-media imgix photos
+// are cropped by imgix directly; anything else goes through the wsrv.nl image
+// proxy.
+function buildImageUrl(rawUrl, fileWidth) {
   if (!rawUrl) return '';
-  const w = displayWidth * 2, h = Math.round(displayWidth * 2 * 9 / 16);
+  const w = fileWidth, h = Math.round(fileWidth * 9 / 16);
   // No URL/URLSearchParams here: Apps Script doesn't have them.
   const host = (rawUrl.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
   if (host.includes('imgix.net')) {
-    return rawUrl.split(/[?#]/)[0] + `?fit=crop&crop=faces%2Centropy%2Ccenter&w=${w}&h=${h}&q=75&fm=jpg`;
+    return rawUrl.split(/[?#]/)[0] + `?fit=crop&crop=faces%2Centropy%2Ccenter&w=${w}&h=${h}&q=${PHOTO_QUALITY}&fm=jpg`;
   }
   if (!host) return rawUrl;
-  return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl.replace(/^https?:\/\//, ''))}&w=${w}&h=${h}&fit=cover&a=attention&output=jpg&q=75`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl.replace(/^https?:\/\//, ''))}&w=${w}&h=${h}&fit=cover&a=attention&output=jpg&q=${PHOTO_QUALITY}`;
 }
 
 // ── HTML generation ──────────────────────────────────────────────────────────
@@ -66,7 +72,7 @@ function featureImageRow(id, feature) {
 <td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; padding: 0px;">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">
 <tr style="mso-line-height-rule: exactly;">
-<td class="image-td tdfw-hero" align="center" valign="top" width="100%" style="mso-line-height-rule: exactly;"><a href="${escAttr(feature.url || '#')}" style="margin: 0; outline: none; padding: 0; color: #000000; display: block; min-width: 100%;"><img src="${escAttr(imgSrc(feature, 675))}" alt="${escAttr(feature.imgAlt || feature.title)}" width="675" style="border: none; display: block; outline: none; width: 675px; opacity: 1; max-width: 100%;"></a></td>
+<td class="image-td tdfw-hero" align="center" valign="top" width="100%" style="mso-line-height-rule: exactly;"><a href="${escAttr(feature.url || '#')}" style="margin: 0; outline: none; padding: 0; color: #000000; display: block; min-width: 100%;"><img src="${escAttr(imgSrc(feature, FEATURE_PHOTO_WIDTH))}" alt="${escAttr(feature.imgAlt || feature.title)}" width="675" style="border: none; display: block; outline: none; width: 675px; opacity: 1; max-width: 100%;"></a></td>
 </tr>
 </table></td>
 </tr>
@@ -186,7 +192,7 @@ function eventRow(id, s) {
   return `<tr id="layout-row${id}" class="layout layout-row clear-this " style="mso-line-height-rule: exactly;">
 <td id="layout-row-padding${id}" valign="top" style="mso-line-height-rule: exactly; font-size: 0; text-align: left;">
 <!--[if mso]><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="top" width="200"><![endif]-->
-<div id="layout-row${id + 1}" class="tdfw-event-img" style="${stackingColumn(EVENT_IMG_WIDTH, 'top')}"><a href="${url}" style="margin: 0; outline: none; padding: 0; color: #000000; display: block;"><img src="${escAttr(imgSrc(s, 600))}" alt="${escAttr(s.imgAlt || s.title)}" width="200" style="border: none; display: block; outline: none; width: 100%; height: auto; opacity: 1;"></a></div><!--[if mso]></td><td valign="top" width="475"><![endif]--><div class="tdfw-event-text" style="${stackingColumn(EVENT_TEXT_WIDTH, 'top')}">
+<div id="layout-row${id + 1}" class="tdfw-event-img" style="${stackingColumn(EVENT_IMG_WIDTH, 'top')}"><a href="${url}" style="margin: 0; outline: none; padding: 0; color: #000000; display: block;"><img src="${escAttr(imgSrc(s, EVENT_PHOTO_WIDTH))}" alt="${escAttr(s.imgAlt || s.title)}" width="200" style="border: none; display: block; outline: none; width: 100%; height: auto; opacity: 1;"></a></div><!--[if mso]></td><td valign="top" width="475"><![endif]--><div class="tdfw-event-text" style="${stackingColumn(EVENT_TEXT_WIDTH, 'top')}">
 <div class="tdfw-event-pad" style="padding: 5px 10px 5px 10px; font-family: arial; color: #000000; font-size: 12px; line-height: 1.4; text-align: left;">
 ${lines.join('\n')}
 </div>

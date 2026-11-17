@@ -451,26 +451,34 @@ function stripYear(dates) {
   return (dates || '').replace(/,?\s*\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// Crops the show photo to 16:9 at 1200px wide so it stays sharp both at 318px
-// on desktop and full-width on a phone.
-// attpac.org photos are cropped by imgix directly; anything else goes through
-// the wsrv.nl image proxy (same approach as the Culture Calendar tool).
+// ── Photo size ── the file each show photo is loaded at. It's shown 318px
+// wide on desktop and full width (up to ~430px) on phones, so 900px keeps it
+// sharp on high-resolution screens. Higher numbers = sharper but heavier
+// emails; quality is JPEG quality, 1-100. The height follows from the 16:9
+// crop.
+const PHOTO_WIDTH = 900;
+const PHOTO_QUALITY = 70;
+
+// Crops the show photo to 16:9 at PHOTO_WIDTH. attpac.org photos are cropped
+// by imgix directly; anything else goes through the wsrv.nl image proxy (same
+// approach as the Culture Calendar tool).
 function buildImageUrl(rawUrl) {
   if (!rawUrl) return '';
+  const w = String(PHOTO_WIDTH), h = String(Math.round(PHOTO_WIDTH * 9 / 16)), q = String(PHOTO_QUALITY);
   try {
     const u = new URL(rawUrl);
     if (u.hostname.includes('imgix.net')) {
       u.search = '';
       u.searchParams.set('fit', 'crop');
       u.searchParams.set('crop', 'faces,entropy,center');
-      u.searchParams.set('w', '1200');
-      u.searchParams.set('h', '675');
-      u.searchParams.set('q', '75');
+      u.searchParams.set('w', w);
+      u.searchParams.set('h', h);
+      u.searchParams.set('q', q);
       u.searchParams.set('fm', 'jpg');
       return u.toString();
     }
   } catch (e) { return rawUrl; }
-  const params = new URLSearchParams({ url: rawUrl.replace(/^https?:\/\//, ''), w: '1200', h: '675', fit: 'cover', a: 'attention', output: 'jpg', q: '75' });
+  const params = new URLSearchParams({ url: rawUrl.replace(/^https?:\/\//, ''), w, h, fit: 'cover', a: 'attention', output: 'jpg', q });
   return `https://wsrv.nl/?${params}`;
 }
 
