@@ -813,7 +813,10 @@ function parseImageSrc(src) {
     };
   }
 
-  if (u.hostname.includes('imgix.net') && u.searchParams.get('w') === '622' && u.searchParams.get('h') === '350') {
+  // This tool's own imgix crops — the current size, or 622x350 from emails
+  // made before the photos were made lighter. Re-generating gives the new size.
+  const w = +u.searchParams.get('w'), h = +u.searchParams.get('h');
+  if (u.hostname.includes('imgix.net') && ((w === PHOTO_WIDTH && h === PHOTO_HEIGHT) || (w === 622 && h === 350))) {
     return {
       imgUrl: src,
       rawImgUrl: u.origin + u.pathname,
@@ -958,8 +961,17 @@ function parseEmail() {
 }
 
 // ── Image sizing ─────────────────────────────────────────────────────────────
-// Every image that ends up in the output HTML is normalized to AT&T's
-// finalized template size — 622x350 — regardless of source. AT&T's own
+// ── Photo size ── the file every show photo is loaded at. Photos are shown
+// 199px wide (desktop and phones), so 400x225 — twice that — stays sharp on
+// high-resolution screens. Higher numbers = sharper but heavier emails;
+// quality is JPEG quality, 1-100. Keep the 16:9 shape: the crop window uses
+// it. (Until Nov 2026 photos were 622x350, AT&T's original template size.)
+const PHOTO_WIDTH = 400;
+const PHOTO_HEIGHT = 225;
+const PHOTO_QUALITY = 70;
+
+// Every image that ends up in the output HTML is normalized to
+// PHOTO_WIDTH x PHOTO_HEIGHT regardless of source. AT&T's own
 // imgix-hosted photos are cropped via imgix's own params (proven pipeline,
 // keeps full quality). Everything else (any 3rd-party page) is routed
 // through wsrv.nl, a free image proxy, which fetches the source image and
@@ -979,12 +991,12 @@ function buildDisplayImageUrl(rawUrl, crop, whiteBg) {
     u.search = '';
     u.searchParams.set('fit', 'crop');
     u.searchParams.set('crop', 'faces,entropy,center');
-    u.searchParams.set('q', '70');
+    u.searchParams.set('q', String(PHOTO_QUALITY));
     u.searchParams.set('auto', 'format');
     u.searchParams.set('or', '0');
     u.searchParams.set('fm', 'jpeg');
-    u.searchParams.set('w', '622');
-    u.searchParams.set('h', '350');
+    u.searchParams.set('w', String(PHOTO_WIDTH));
+    u.searchParams.set('h', String(PHOTO_HEIGHT));
     if (whiteBg) u.searchParams.set('bg', 'FFFFFF');
     return u.toString();
   }
@@ -992,11 +1004,11 @@ function buildDisplayImageUrl(rawUrl, crop, whiteBg) {
   const bare = rawUrl.replace(/^https?:\/\//, '');
   const params = new URLSearchParams();
   params.set('url', bare);
-  params.set('w', '622');
-  params.set('h', '350');
+  params.set('w', String(PHOTO_WIDTH));
+  params.set('h', String(PHOTO_HEIGHT));
   params.set('fit', 'cover');
   params.set('output', 'jpg');
-  params.set('q', '75');
+  params.set('q', String(PHOTO_QUALITY));
   if (crop) {
     params.set('cx', String(Math.round(crop.x)));
     params.set('cy', String(Math.round(crop.y)));
@@ -1139,10 +1151,10 @@ function backToGallery() {
   renderGalleryGrid();
 }
 
-const CROP_RATIO = 622 / 350;
+const CROP_RATIO = PHOTO_WIDTH / PHOTO_HEIGHT;
 
 function startCrop(rawUrl, showId) {
-  document.getElementById('modal-title').textContent = 'Crop image (622 × 350)';
+  document.getElementById('modal-title').textContent = `Crop image (${PHOTO_WIDTH} × ${PHOTO_HEIGHT})`;
   const body = document.getElementById('modal-body');
   const backBtn = galleryState ? '<button class="btn btn-ghost btn-sm" onclick="backToGallery()">&larr; Back</button>' : '';
   body.innerHTML = `
@@ -1451,7 +1463,7 @@ function updateShow(id, field, val) {
   if (show) { show[field] = val; }
 }
 
-// Manually pasted URLs still get the default 622x350 smart crop applied
+// Manually pasted URLs still get the default PHOTO_WIDTH x PHOTO_HEIGHT smart crop applied
 // behind the scenes (same as fetched images) — the field just keeps showing
 // exactly what was typed rather than the generated proxy URL.
 function handleManualImageInput(id, raw) {

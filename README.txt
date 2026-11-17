@@ -80,8 +80,9 @@ and generate copy-ready HTML blocks for ActiveCampaign.
    - the fetch icon auto-picks the best photo from that show's page, or
    - the gallery icon opens every image found on the page so you can pick
      one and drag/zoom to crop it manually.
-   All images are normalized to AT&T's standard 622×350 size, whichever
-   method you use. A green "✓" badge appears on each show when successful;
+   All images are cropped to 16:9 and loaded at 400×225 (twice the 199px
+   they're shown at, so they stay sharp), whichever method you use. The
+   size is set by PHOTO_WIDTH / PHOTO_HEIGHT in the tool's code. A green "✓" badge appears on each show when successful;
    if nothing is found, paste an image URL manually, or pick one from the
    "Preset image…" dropdown (hard-coded links in public/tools/culture-calendar/preset-images.js;
    presets are used as-is, not cropped).
@@ -100,7 +101,7 @@ and generate copy-ready HTML blocks for ActiveCampaign.
   http/https page you give it.
 - AT&T's own imgix-hosted photos are cropped via imgix directly (matches
   the original finalized templates exactly). Everything else is cropped/
-  resized to 622×350 via images.weserv.nl (wsrv.nl), a free public image
+  resized to 400×225 via images.weserv.nl (wsrv.nl), a free public image
   proxy — the final image URL in the HTML points there, not at your
   computer, so no image hosting/storage is needed on your end.
 - Pages are fetched politely: at most two at a time from the same site, and
